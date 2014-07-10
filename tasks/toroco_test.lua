@@ -16,6 +16,7 @@ local output_events = {setvel2mtr={}}
 
 M.init = function(conf)
 	local toroco = require 'toroco'
+    local sched = require 'lumen.sched'
 
 	toroco.register_behavior(conf, triggers, output_events)
 	

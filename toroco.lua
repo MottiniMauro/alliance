@@ -1,7 +1,7 @@
 local M = {}
 
 local toribio = require 'toribio'
-local sched = require 'sched'
+local sched = require 'lumen.sched'
 local mutex = require 'lumen.mutex'
 
 -- Behaviors managed by Torocó
@@ -130,7 +130,7 @@ M.register_behavior = function(conf, triggers, output_events)
                 dispach_signal(...)
             end)
 
-            toribio.sched.sigrun(waitd, fsynched)
+            sched.sigrun(waitd, fsynched)
 
         -- if the event doesnt come from a device, ...
         elseif conf[trigger_name].emitter.type == 'behavior' then
