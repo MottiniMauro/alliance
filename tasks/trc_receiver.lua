@@ -30,8 +30,6 @@ M.init = function(conf)
     local sched = require 'lumen.sched'
 
 	toroco.register_behavior(conf, triggers, output_events)
-	
-	print ("hola")
 end
 
 return M

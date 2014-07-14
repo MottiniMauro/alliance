@@ -16,7 +16,7 @@ local motor1_setvel, motor2_setvel = {}, {}
 
 local callback1 = function(event, v) 
 	print (event, '=', v)
-    sched.signal (motor1_setvel, 1, 100, 1, 100)
+    sched.signal (motor1_setvel, 0, 0)
 end
 
 local callback2 = function(event, v) 
@@ -30,7 +30,7 @@ triggers.trigger1 = {event = 'leftbutton', callback = callback1}
 
 triggers.trigger2 = {event = 'rightbutton', callback = callback2}
 
--- Events emitted by the module.
+-- Output events emitted by the module.
 
 local output_events = {motor1_setvel = motor1_setvel, motor2_setvel = motor2_setvel}
 
@@ -39,8 +39,6 @@ local output_events = {motor1_setvel = motor1_setvel, motor2_setvel = motor2_set
 M.init = function(conf)
 
 	toroco.register_behavior(conf, triggers, output_events)
-	
-	print ("hola")
 end
 
 return M
