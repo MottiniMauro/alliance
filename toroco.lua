@@ -8,6 +8,11 @@ local mutex = require 'lumen.mutex'
 
 M.behaviors = {}
 
+local events = {
+	new_behavior = {}
+}
+M.events = events
+
 -- List of registered receivers for each event
 
 local registered_receivers = {}
@@ -84,7 +89,43 @@ M.wait = function(waitd)
     
 end
 
+
+--
+
+M.wait_for_behavior = function(behavior_name, timeout)
+    assert(sched.running_task, 'Must run in a task')
+
+    if M.behaviors[behavior] and M.behaviors[behavior].loaded then
+        return M.behaviors[behavior]
+    end
+
+	local wait_until
+	if timeout then 
+        wait_until=sched.get_time() + timeout 
+    end
+    
+    local waitd = {M.events.new_behavior}
+    if wait_until then 
+        waitd.timeout=wait_until-sched.get_time() 
+    end
+
+    while true do
+	    local ev, new_behavior_name = sched.wait(waitd) 
+	    if not ev then --timeout
+		    return nil, 'timeout'
+	    end
+	    if new_behavior_name == behavior_name then
+		    return M.behaviors[behavior_name] 
+	    end
+	    if wait_until then 
+            waitd.timeout=wait_until-sched.get_time() 
+        end
+    end
+    
+end
+
 -- registers a behavior to Torocó.
+-- Each trigger registers a callback function for a list of events.
 -- conf: configuration table from the behavior.
 -- triggers: table of triggers (event with callback function).
 -- output_events: table of events emitted by the behavior.
@@ -94,6 +135,28 @@ M.register_behavior = function(conf, triggers, output_events)
     local task_name = get_task_name(conf)
 
     M.behaviors[task_name] = { events = output_events }
+
+    -- Foreach evento, registrar una funcion que cuando ocurre el evento, entonces si es un device se llama la funcion del device
+
+    for event, send_to in pairs(conf.events or {}) do
+
+        if send_to.receiver.type == 'device' then
+            local device = toribio.wait_for_device (send_to.receiver.name)   
+            
+            local proxy = function(_, ...)
+                device[send_to.reciever.event](...)
+            end
+        
+            local waitd = {
+                output_events[event]
+            }
+
+            local mx = mutex.new()
+            local fsynched = mx:synchronize (proxy)
+
+            sched.sigrun(waitd, fsynched)
+        end
+    end
 
     -- initialize
     -- sched.signal(senal_primera)
@@ -112,42 +175,41 @@ M.register_behavior = function(conf, triggers, output_events)
         if conf[trigger_name].emitter.type == 'device' then
             local device = toribio.wait_for_device (conf[trigger_name].emitter.name)             
 
-            --toribio.register_callback (device, trigger.event, function(...)
-            --    dispach_signal(conf[trigger_name].emitter.name, trigger.event, ...)
-            --end)
             if not device.events or not device.events[trigger.event] then 
                 log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(trigger.event))
             end
 
-            register_receiver_event(task_name, device.events[trigger.event], trigger.event, trigger.callback)
+            register_receiver_event (task_name, device.events[trigger.event], trigger.event, trigger.callback)
 
             local waitd = {
                 device.events[trigger.event]
             }
 
             local mx = mutex.new()
-            local fsynched = mx:synchronize (function(...)
-                dispach_signal(...)
-            end)
+            local fsynched = mx:synchronize (dispach_signal)
 
             sched.sigrun(waitd, fsynched)
 
         -- if the event doesnt come from a device, ...
         elseif conf[trigger_name].emitter.type == 'behavior' then
+            local behavior = M.wait_for_behavior(conf[trigger_name].emitter.name)
 
-            local event = M.behaviors[conf[trigger_name].emitter.name].events[trigger.event]
+            local event = behavior.events[trigger.event]
 
-            register_receiver_event(task_name, event, trigger.callback)
+            register_receiver_event (task_name, event, trigger.event, trigger.callback)
 
             local waitd = {event}
             local mx = mutex.new()
-            local fsynched = mx:synchronize(dispach_signal)
+            local fsynched = mx:synchronize (dispach_signal)
 
             sched.sigrun(waitd, fsynched)
         else
             -- error
         end
     end
+
+    M.behaviors[task_name].loaded = true
+    sched.signal(M.events.new_behavior, task_name)
 end
 
 return M
