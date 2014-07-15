@@ -7,7 +7,21 @@
 *.BAK
 *.bak
 
-deviceloaders
+deviceloaders/bobot.lua
+deviceloaders/dynamixel.lua
+deviceloaders/haar
+deviceloaders/mice.lua
+deviceloaders/rnr_client.lua
+deviceloaders/distrigger.lua
+deviceloaders/filedev.lua
+deviceloaders/haar.lua
+deviceloaders/openmoko_accel.lua
+deviceloaders/dynamixel
+deviceloaders/gpsd.lua
+deviceloaders/joystick.lua
+deviceloaders/openmoko.lua
+deviceloaders/xo_accel.lua
+
 docs
 lumen
 nixio

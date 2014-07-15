@@ -16,14 +16,20 @@ M.events = events
 -- List of registered receivers for each event
 
 local registered_receivers = {}
+local inhibited_events = {}
 
 -- This function is executed when Torocó captures a signal.
 
 local dispach_signal = function (event, ...)
-    for _, receiver in ipairs(registered_receivers[event]) do
-        -- sched.signal(receiver.event_alias, ...) FIXME: Version usando eventos alias
-        receiver.callback(event, ...)
-    end 
+
+
+    if (not inhibited_events [event]) then
+
+        for _, receiver in ipairs(registered_receivers[event]) do
+            -- sched.signal(receiver.event_alias, ...) FIXME: Version usando eventos alias
+            receiver.callback(event, ...)
+        end 
+    end
 
 --[[
     if not emisor_está_inhibido (sender, event) then
@@ -35,6 +41,31 @@ local dispach_signal = function (event, ...)
     end
 --]]
 end
+
+
+-- This function inhibits an event sent by a behavior.
+-- emitter: return value of wait_for_behavior or wait_for_device.
+-- event_name: string
+
+M.inhibit = function(emitter, event_name)
+
+    local event = emitter.events [event_name]
+
+    inhibited_events [event] = event
+end
+
+-- This function releases an inhibition.
+-- emitter: return value of wait_for_behavior or wait_for_device.
+-- event_name: string
+
+M.release_inhibition = function(emitter, event_name)
+
+    local event = emitter.events [event_name]
+
+    inhibited_events [event] = nil
+end
+
+-- /// *** ///
 
 -- Registers the events that a behavior wants to receive.
 -- The data is stored in receivers_events.
@@ -157,6 +188,7 @@ M.register_behavior = function(conf, triggers, output_events)
 
     local task_name = get_task_name(conf)
 
+    -- add behavior to 'M.behaviors'
     M.behaviors[task_name] = { events = output_events }
 
     -- For each output event of the behavior, ...

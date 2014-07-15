@@ -1,9 +1,9 @@
--- /// Toroco_test ///
+-- /// trc_sender ///
 
-local toroco = require 'toroco'
 local sched = require 'lumen.sched'
+local toroco = require 'toroco'
 
--- local variables
+-- /// local variables ///
 	
 local M = {}
 
@@ -12,7 +12,7 @@ local devices = {}
 
 local motor1_setvel, motor2_setvel = {}, {}
 
--- Callback functions
+-- /// Callback functions ///
 
 local callback1 = function(event, v) 
 	print (event, '=', v)
@@ -21,20 +21,21 @@ end
 
 local callback2 = function(event, v) 
 	print (event, '=', v)
-    sched.signal (motor2_setvel, 1, 50, 1, 50)
+    sched.signal (motor2_setvel, v)
 end
 
--- Triggers
+-- /// Triggers ///
 
 triggers.trigger1 = {event = 'leftbutton', callback = callback1}
 
 triggers.trigger2 = {event = 'rightbutton', callback = callback2}
 
--- Output events emitted by the module.
+-- /// Output events ///
+-- Events emitted by the module.
 
 local output_events = {motor1_setvel = motor1_setvel, motor2_setvel = motor2_setvel}
 
--- Init function
+-- /// Init function ///
 
 M.init = function(conf)
 
