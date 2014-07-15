@@ -142,20 +142,20 @@ M.wait_for_behavior = function(behavior_name, timeout)
 
     -- if the behavior is already loaded, return success.
 
-    if M.behaviors[behavior] and M.behaviors[behavior].loaded then
-        return M.behaviors[behavior]
+    if M.behaviors[behavior_name] and M.behaviors[behavior_name].loaded then
+        return M.behaviors[behavior_name]
     end
 
     -- else, ...
 
 	local wait_until
 	if timeout then 
-        wait_until=sched.get_time() + timeout 
+        wait_until = sched.get_time() + timeout 
     end
     
     local waitd = {M.events.new_behavior}
     if wait_until then 
-        waitd.timeout=wait_until-sched.get_time() 
+        waitd.timeout = wait_until-sched.get_time() 
     end
 
     while true do
