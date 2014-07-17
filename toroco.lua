@@ -8,6 +8,9 @@ local mutex = require 'lumen.mutex'
 
 M.behaviors = {}
 
+M.running_behavior = nil
+
+
 local events = {
 	new_behavior = {}
 }
@@ -21,13 +24,22 @@ local inhibited_events = {}
 -- This function is executed when Torocó captures a signal.
 
 local dispach_signal = function (event, ...)
+    
+    if inhibited_events [event] and inhibited_events [event].expire_time < sched.get_time() then
+        inhibited_events [event] = nil
+    end
 
-
-    if (not inhibited_events [event]) then
+    if not inhibited_events [event] then
 
         for _, receiver in ipairs(registered_receivers[event]) do
-            -- sched.signal(receiver.event_alias, ...) FIXME: Version usando eventos alias
-            receiver.callback(event, ...)
+            if receiver.inhibited and receiver.inhibited.expire_time < sched.get_time() then
+                receiver.inhibited = nil
+            end
+
+            if not receiver.inhibited then
+                -- sched.signal(receiver.event_alias, ...) FIXME: Version usando eventos alias
+                receiver.callback(event, ...)
+            end
         end 
     end
 
@@ -46,12 +58,25 @@ end
 -- This function inhibits an event sent by a behavior.
 -- emitter: return value of wait_for_behavior or wait_for_device.
 -- event_name: string
+-- timeout: number (optional)
 
-M.inhibit = function(emitter, event_name)
+M.inhibit = function(emitter, event_name, timeout)
 
     local event = emitter.events [event_name]
+    
+    -- if the event is not inhibited for longer than proposed, set the new time.
+    -- if the event is inhibited for longer than proposed, do nothing.
+    -- if there is no timeout, delete the expire time.
 
-    inhibited_events [event] = event
+    if timeout then
+        if not inhibited_events [event] 
+        or not inhibited_events [event].expire_time 
+        or inhibited_events [event].expire_time < sched.get_time() + timeout then
+            inhibited_events [event] = { expire_time = sched.get_time() + timeout }
+        end
+    else
+        inhibited_events [event] = { expire_time = nil }
+    end
 end
 
 -- This function releases an inhibition.
@@ -63,6 +88,46 @@ M.release_inhibition = function(emitter, event_name)
     local event = emitter.events [event_name]
 
     inhibited_events [event] = nil
+end
+
+-- This function suppress an event received by a behavior.
+-- emitter: return value of wait_for_behavior or wait_for_device.
+-- event_name: string
+-- receiver_name: string
+
+M.suppress = function(emitter, event_name, receiver_name, timeout)
+    
+    local event = emitter.events [event_name]
+
+    for _, receiver in ipairs(registered_receivers[event]) do
+        if receiver.name == receiver_name then
+            if timeout then
+                if not receiver.inhibited 
+                or not receiver.inhibited.expire_time 
+                or receiver.inhibited.expire_time < sched.get_time() + timeout then
+                    receiver.inhibited = { expire_time = sched.get_time() + timeout }
+                end
+            else
+                receiver.inhibited = { expire_time = nil }
+            end
+        end
+    end 
+end
+
+-- This function releases a suppression.
+-- emitter: return value of wait_for_behavior or wait_for_device.
+-- event_name: string
+-- receiver_name: string
+
+M.release_suppression = function(emitter, event_name, receiver_name)
+    
+    local event = emitter.events [event_name]
+
+    for _, receiver in ipairs(registered_receivers[event]) do
+        if receiver.name == receiver_name then
+            receiver.inhibited = false;
+        end
+    end 
 end
 
 -- /// *** ///

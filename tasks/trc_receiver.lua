@@ -29,9 +29,11 @@ local callback_trigger2 = function (event, value)
     local mice = toribio.wait_for_device ({module = 'mice'})
 
     if value then
-        toroco.inhibit (mice, 'leftbutton')
+        -- toroco.inhibit (mice, 'leftbutton', 4)
+        toroco.suppress (mice, 'leftbutton', 'trc_sender', 4)
     else
-        toroco.release_inhibition (mice, 'leftbutton')
+        -- toroco.release_inhibition (mice, 'leftbutton')
+        toroco.release_suppression (mice, 'leftbutton', 'trc_sender')
     end
 end
 
