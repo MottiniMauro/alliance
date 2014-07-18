@@ -17,7 +17,7 @@ M.init = function(conf)
 	device.name=devicename
 
 	--- Module name (in this case, 'mice').
-	device.module='toroco_test'
+	device.module='trc_motor'
 
 
 	--- Events emitted by this device.

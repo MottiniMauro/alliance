@@ -1,15 +1,19 @@
+package.path = package.path .. ";;;lumen/?.lua;toribio/?/init.lua;toribio/?.lua"
+
 local M = {}
 
 local toribio = require 'toribio'
 local sched = require 'lumen.sched'
 local mutex = require 'lumen.mutex'
+local log = require 'lumen.log'
+
+require 'lumen.tasks.selector'.init({service='nixio'})
 
 -- Behaviors managed by Torocó
 
 M.behaviors = {}
 
-M.running_behavior = nil
-
+--M.running_behavior = nil
 
 local events = {
 	new_behavior = {}
@@ -25,7 +29,7 @@ local inhibited_events = {}
 
 local dispach_signal = function (event, ...)
     
-    if inhibited_events [event] and inhibited_events [event].expire_time < sched.get_time() then
+    if inhibited_events [event] and inhibited_events [event].expire_time and inhibited_events [event].expire_time < sched.get_time() then
         inhibited_events [event] = nil
     end
 
@@ -42,16 +46,6 @@ local dispach_signal = function (event, ...)
             end
         end 
     end
-
---[[
-    if not emisor_está_inhibido (sender, event) then
-        for receiver, _ in ipairs(registered_receivers[event]) do
-            if (not receptor_está_inhibido (receiver, event)) then
-                send (eventos_nombrados.event.receiver)
-            end
-        end
-    end
---]]
 end
 
 
@@ -63,7 +57,7 @@ end
 M.inhibit = function(emitter, event_name, timeout)
 
     local event = emitter.events [event_name]
-    
+    print(event_name)
     -- if the event is not inhibited for longer than proposed, set the new time.
     -- if the event is inhibited for longer than proposed, do nothing.
     -- if there is no timeout, delete the expire time.
@@ -160,11 +154,11 @@ end
 -- Stores the task for each event of the trigger in 'registered_receivers',
 -- and registers the event aliases for the trigger.
 
-local register_receiver_event = function(behavior_name, event, event_name, callback)
+local register_trigger = function(behavior_name, trigger)
 
-    if not registered_receivers[event] then
-        register_dispacher (event)
-        registered_receivers[event] = {}
+    if not registered_receivers[trigger.event.signal] then
+        register_dispacher (trigger.event.signal)
+        registered_receivers[trigger.event.signal] = {}
     end
 
     local receiver = {}
@@ -177,11 +171,11 @@ local register_receiver_event = function(behavior_name, event, event_name, callb
     local waitd = {receiver.event_alias}
 --]]
 
-    table.insert(registered_receivers[event], receiver)
+    table.insert(registered_receivers[trigger.event.signal], receiver)
 
     local mx = mutex.new()
     local fsynched = mx:synchronize (function(_, ...)
-            callback(event_name, ...)
+            trigger.callback(trigger.event.name, ...)
         end
     )
 
@@ -249,67 +243,113 @@ end
 -- triggers: table of triggers (event with callback function).
 -- output_events: table of events emitted by the behavior.
 
-M.register_behavior = function(conf, triggers, output_events)
+M.new_behavior = function(behavior_desc)
+    if type (behavior_desc) == 'string' then 
+        local behavior_name = behavior_desc
+        local packagename = 'behaviors/'..behavior_name
 
-    local task_name = get_task_name(conf)
+        local behavior_desc2 = require (packagename)
+        behavior_desc2.name = behavior_desc
+        behavior_desc = behavior_desc2
+    end
 
     -- add behavior to 'M.behaviors'
-    M.behaviors[task_name] = { events = output_events }
-
-    -- For each output event of the behavior, ...
-    for event, send_to in pairs(conf.events or {}) do
-
-        -- if the receiver is a device, ...
-        if send_to.receiver.type == 'device' then
-
-            local device = toribio.wait_for_device (send_to.receiver.name)   
-            
-            -- Proxy of the target function
-            local proxy = function(_, ...)
-                device[send_to.receiver.event](...)
-            end
-
-            -- registers the proxy for the event.
-            register_receiver_event (send_to.receiver.name, output_events[event], event, proxy)
-        end
-    end
+    M.behaviors[behavior_desc.name] = { events = behavior_desc.events }
     
-    -- for each trigger, ...
+    -- emits new_behavior.
+    M.behaviors[behavior_desc.name].loaded = true
+    sched.signal(M.events.new_behavior,behavior_desc.name)
 
-    for trigger_name, trigger in pairs (triggers) do 
+    for trigger_name, trigger in pairs (behavior_desc.triggers) do 
 
         if trigger.event then
-            trigger.events = {trigger.event}
+            -- registers the trigger events.
+            register_trigger (behavior_desc.name, trigger)
         end
 
-        -- registers the trigger events.
-
-        -- if the event comes from a device, ...
-        if conf[trigger_name].emitter.type == 'device' then
-
-            local device = toribio.wait_for_device (conf[trigger_name].emitter.name)             
-
-            if not device.events or not device.events[trigger.event] then 
-                log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(trigger.event))
-            end
-
-            register_receiver_event (task_name, device.events[trigger.event], trigger.event, trigger.callback)
-
-        -- if the event doesnt come from a device, ...
-        elseif conf[trigger_name].emitter.type == 'behavior' then
-
-            local behavior = M.wait_for_behavior(conf[trigger_name].emitter.name)
-
-            register_receiver_event (task_name, behavior.events[trigger.event], trigger.event, trigger.callback)
-        else
-            -- error
-        end
+        local meta = {
+            __newindex = function (table, key, value)
+                rawset(table, key, value)
+                if key == 'event' then
+                    register_trigger (behavior_desc.name, table)
+                end
+            end,
+        }
+        trigger = setmetatable(trigger, meta)
     end
 
-    -- emits new_behavior.
+    local meta = {
+        __newindex = function (table, key, value)
+            -- Proxy of the target function
+            local proxy = function(_, ...)
+                value(...)
+            end
 
-    M.behaviors[task_name].loaded = true
-    sched.signal(M.events.new_behavior, task_name)
+            local trigger = { 
+                event = { signal = behavior_desc.events[key], name = key },
+                callback = proxy
+            }
+
+            -- registers the proxy for the event.
+            register_trigger (value.emitter, trigger)
+        end,
+    }
+
+    behavior_desc.output = setmetatable({}, meta)
+
+    return behavior_desc
 end
+
+
+M.run = function(main, toribio_conf_file)
+    if toribio_conf then
+        M.load_configuration(toribio_conf_file)
+    else
+        M.load_configuration('toribio.conf')
+    end
+
+    sched.run(main)
+    sched.loop()
+end
+
+-------------------------------------------------------------------------------
+
+M.load_configuration = function(file)
+	local func_conf, err = loadfile(file)
+	assert(func_conf,err)
+	local conf = toribio.configuration
+	local meta_create_on_query 
+	meta_create_on_query = {
+		__index = function (table, key)
+			table[key]=setmetatable({}, meta_create_on_query)
+			return table[key]
+		end,
+	}
+	setmetatable(conf, meta_create_on_query)
+	setfenv(func_conf, conf)
+	func_conf()
+	meta_create_on_query['__index']=nil
+
+    sched.run(function()
+        for _, section in ipairs({'deviceloaders', 'tasks'}) do
+	        for task, conf in pairs(toribio.configuration[section] or {}) do
+		        log ('TORIBIOGO', 'DETAIL', 'Processing conf %s %s: %s', section, task, tostring((conf and conf.load) or false))
+
+		        if conf and conf.load==true then
+			        --[[
+			        local taskmodule = require (section..'/'..task)
+			        if taskmodule.start then
+				        local ok = pcall(taskmodule.start,conf)
+			        end
+			        --]]
+			        log ('TORIBIOGO', 'INFO', 'Starting %s %s', section, task)
+			        toribio.start(section, task)
+		        end
+	        end
+        end
+    end)
+end
+
+-------------------------------------------------------------------------------
 
 return M
