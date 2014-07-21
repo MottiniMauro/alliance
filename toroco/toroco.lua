@@ -2,12 +2,16 @@ package.path = package.path .. ";;;lumen/?.lua;toribio/?/init.lua;toribio/?.lua"
 
 local M = {}
 
+-- *** Requires ***
+
 local toribio = require 'toribio'
 local sched = require 'lumen.sched'
 local mutex = require 'lumen.mutex'
 local log = require 'lumen.log'
 
 require 'lumen.tasks.selector'.init({service='nixio'})
+
+-- *** Variables ***
 
 -- Behaviors managed by Torocó
 
@@ -25,23 +29,30 @@ M.events = events
 local registered_receivers = {}
 local inhibited_events = {}
 
+-- *** Functions ***
+
 -- This function is executed when Torocó captures a signal.
 
-local dispach_signal = function (event, ...)
+local dispatch_signal = function (event, ...)
     
+    -- inhibition
     if inhibited_events [event] and inhibited_events [event].expire_time and inhibited_events [event].expire_time < sched.get_time() then
         inhibited_events [event] = nil
     end
 
     if not inhibited_events [event] then
 
-        for _, receiver in ipairs(registered_receivers[event]) do
+        -- for each receiver, ...
+        for _, receiver in ipairs (registered_receivers[event]) do
+
+            -- suppression
             if receiver.inhibited and receiver.inhibited.expire_time < sched.get_time() then
                 receiver.inhibited = nil
             end
 
             if not receiver.inhibited then
-                -- sched.signal(receiver.event_alias, ...) FIXME: Version usando eventos alias
+            
+                -- dispatch event to the receiver
                 receiver.callback(event, ...)
             end
         end 
@@ -84,7 +95,7 @@ M.release_inhibition = function(emitter, event_name)
     inhibited_events [event] = nil
 end
 
--- This function suppress an event received by a behavior.
+-- This function suppresses an event received by a behavior.
 -- emitter: return value of wait_for_behavior or wait_for_device.
 -- event_name: string
 -- receiver_name: string
@@ -124,8 +135,6 @@ M.release_suppression = function(emitter, event_name, receiver_name)
     end 
 end
 
--- /// *** ///
-
 -- Registers the events that a behavior wants to receive.
 -- The data is stored in receivers_events.
 
@@ -138,17 +147,35 @@ local get_task_name = function(conf)
     end
 end
 
--- Registers the dispach singal function to an event
+-- Registers the dispatch signal function to an event
 
-local register_dispacher = function(event)
+local register_dispatcher = function(event)
     local waitd = {
         event
     }
 
     local mx = mutex.new()
-    local fsynched = mx:synchronize (dispach_signal)
+    local fsynched = mx:synchronize (dispatch_signal)
 
     sched.sigrun(waitd, fsynched)
+end
+
+local get_trigger_event = function(trigger)
+    if trigger.event.type == 'device' then
+        local device = toribio.wait_for_device ({ module = trigger.event.emitter })     
+        if not device.events or not device.events[trigger.event.name] then 
+            log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(trigger.event.name))
+        end
+
+        return device.events[trigger.event.name]
+    elseif trigger.event.type == 'behavior' then
+        local behavior = M.wait_for_behavior (trigger.event.emitter)             
+        if not behavior.events or not behavior.events[trigger.event.name] then 
+            log ('TOROCO', 'WARN', 'Event not found for behavior %s: "%s"', tostring(behavior), tostring(trigger.event.name))
+        end
+
+        return behavior.events[trigger.event.name]
+    end
 end
 
 -- Stores the task for each event of the trigger in 'registered_receivers',
@@ -156,36 +183,43 @@ end
 
 local register_trigger = function(behavior_name, trigger)
 
-    if not registered_receivers[trigger.event.signal] then
-        register_dispacher (trigger.event.signal)
-        registered_receivers[trigger.event.signal] = {}
+    local event = get_trigger_event(trigger)
+
+    if not registered_receivers[event] then
+        registered_receivers[event] = {}
+
+        register_dispatcher (event)
     end
 
+    -- initialize the receiver
     local receiver = {}
     receiver.name = behavior_name
-
---[[ FIXME: Version usando eventos alias
-    receiver.event_alias = {}
-
-
-    local waitd = {receiver.event_alias}
---]]
-
-    table.insert(registered_receivers[trigger.event.signal], receiver)
-
+    table.insert(registered_receivers[event], receiver)
+    
+    -- initialize callback
     local mx = mutex.new()
     local fsynched = mx:synchronize (function(_, ...)
             trigger.callback(trigger.event.name, ...)
         end
     )
-
     receiver.callback = fsynched
 
---[[ FIXME: Version usando eventos alias
-    sched.sigrun(waitd, fsynched)
---]]
-
 end 
+
+
+local register_output_target = function(behavior_name, output_name, target)
+    local proxy = function(_, ...)
+        target(...)
+    end
+
+    local trigger = { 
+        event = { type = 'behavior', emmitter = behavior_name, name = output_name },
+        callback = proxy
+    }
+
+    -- registers the (proxy) target function for the event.
+    register_trigger (target.emitter, trigger)
+end
 
 -- mystic function
 
@@ -260,24 +294,29 @@ M.new_behavior = function(behavior_desc)
     M.behaviors[behavior_desc.name].loaded = true
     sched.signal(M.events.new_behavior,behavior_desc.name)
 
+    -- for each trigger of the behavior, ...
     for trigger_name, trigger in pairs (behavior_desc.triggers) do 
 
+        -- registers the trigger events.
         if trigger.event then
-            -- registers the trigger events.
             register_trigger (behavior_desc.name, trigger)
         end
-
-        local meta = {
-            __newindex = function (table, key, value)
-                rawset(table, key, value)
-                if key == 'event' then
-                    register_trigger (behavior_desc.name, table)
-                end
-            end,
-        }
+    
+--[[
+        -- method to update the trigger event.
+        local meta = getmetatable(trigger) or {}
+        meta.__newindex = function (table, key, value)
+            rawset(table, key, value)
+            if key == 'event' then
+                -- TODO: Do somehting if the trigger already had an event.
+                register_trigger (behavior_desc.name, table)
+            end
+        end
         trigger = setmetatable(trigger, meta)
+--]]
     end
-
+--[[
+    -- method to update an output event.
     local meta = {
         __newindex = function (table, key, value)
             -- Proxy of the target function
@@ -290,16 +329,17 @@ M.new_behavior = function(behavior_desc)
                 callback = proxy
             }
 
-            -- registers the proxy for the event.
+            -- registers the (proxy) target function for the event.
             register_trigger (value.emitter, trigger)
-        end,
+        end
     }
-
     behavior_desc.output = setmetatable({}, meta)
-
+--]]
     return behavior_desc
 end
 
+
+-- Torocó main function
 
 M.run = function(main, toribio_conf_file)
     if toribio_conf then
@@ -312,7 +352,36 @@ M.run = function(main, toribio_conf_file)
     sched.loop()
 end
 
+
+
+M.run2 = function(behaviors, toribio_conf_file)
+    if toribio_conf then
+        M.load_configuration(toribio_conf_file)
+    else
+        M.load_configuration('toribio.conf')
+    end
+
+    for behavior_name, behavior_table in pairs(behaviors) do
+        local load_behavior = function()
+            local behavior = M.new_behavior(behavior_name)
+            for trigger_name, event in pairs(behavior_table.triggers) do
+                behavior.triggers[trigger_name].event = event
+                register_trigger (behavior_name, behavior.triggers[trigger_name])
+            end
+
+            for output_name, target in pairs(behavior_table.output_targets or {}) do
+                register_output_target(behavior_name, output_name, target)
+            end
+        end
+        sched.run(load_behavior)
+    end
+
+    sched.loop()
+end
+
 -------------------------------------------------------------------------------
+
+-- load toribio.conf
 
 M.load_configuration = function(file)
 	local func_conf, err = loadfile(file)

@@ -9,14 +9,6 @@ meta3 = {
 		table = setmetatable(table, {})
         table.name = key
 
-        local behavior = toroco.wait_for_behavior (table.emitter)             
-
-        if not behavior.events or not behavior.events[table.name] then 
-            log ('TOROCO', 'WARN', 'Event not found for behavior %s: "%s"', tostring(behavior), tostring(table.name))
-        end
-
-        table.signal = behavior.events[table.name]
-
 		return table
 	end,
 }

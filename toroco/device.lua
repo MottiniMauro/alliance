@@ -8,14 +8,6 @@ meta3 = {
 	__index = function (table, key)
 		table = setmetatable(table, {})
         table.name = key
-        
-        local device = toribio.wait_for_device ({ module = table.emitter })             
-
-        if not device.events or not device.events[table.name] then 
-            log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(table.name))
-        end
-
-        table.signal = device.events[table.name]
 
 		return table
 	end,
