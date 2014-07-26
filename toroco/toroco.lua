@@ -68,7 +68,7 @@ end
 M.inhibit = function(emitter, event_name, timeout)
 
     local event = emitter.events [event_name]
-    print(event_name)
+
     -- if the event is not inhibited for longer than proposed, set the new time.
     -- if the event is inhibited for longer than proposed, do nothing.
     -- if there is no timeout, delete the expire time.
@@ -162,19 +162,45 @@ end
 
 local get_trigger_event = function(trigger)
     if trigger.event.type == 'device' then
+
+        -- FIXME: emitter should be devicename not module name
         local device = toribio.wait_for_device ({ module = trigger.event.emitter })     
         if not device.events or not device.events[trigger.event.name] then 
             log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(trigger.event.name))
         end
 
         return device.events[trigger.event.name]
-    elseif trigger.event.type == 'behavior' then
-        local behavior = M.wait_for_behavior (trigger.event.emitter)             
+
+    elseif trigger.event.type == 'behavior' then 
+
+        local behavior = M.wait_for_behavior (trigger.event.emitter)     
+       
         if not behavior.events or not behavior.events[trigger.event.name] then 
             log ('TOROCO', 'WARN', 'Event not found for behavior %s: "%s"', tostring(behavior), tostring(trigger.event.name))
         end
 
         return behavior.events[trigger.event.name]
+
+    elseif trigger.event.type == 'function' then
+
+        local device = toribio.wait_for_device (trigger.event.emitter)
+        
+        local event = {}
+        local value = nil
+
+        -- TODO: There should be only one polling function per target
+        local polling_function = function()
+            local new_value = device.get_value ();
+
+            if (new_value ~= value) then
+                value = new_value
+                sched.signal (event, new_value)
+            end
+        end
+
+        sched.sigrun ({ {}, timeout = 0.1 }, polling_function)
+
+        return event
     end
 end
 
@@ -213,7 +239,7 @@ local register_output_target = function(behavior_name, output_name, target)
     end
 
     local trigger = { 
-        event = { type = 'behavior', emmitter = behavior_name, name = output_name },
+        event = { type = 'behavior', emitter = behavior_name, name = output_name },
         callback = proxy
     }
 

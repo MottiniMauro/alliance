@@ -24,6 +24,8 @@ meta2 = {
                     device[key](...)
                 end
             }
+            table.type = 'function'
+            table.name = key
 
             return setmetatable(table, meta_call_device)
         end
