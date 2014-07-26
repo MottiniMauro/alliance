@@ -271,112 +271,84 @@ M.wait_for_behavior = function(behavior_name, timeout)
 end
 
 -- /// Registers a behavior to Torocó. ///
--- Each trigger registers a callback function for a list of events.
--- Each output event registers the target function.
--- conf: configuration table from the behavior.
--- triggers: table of triggers (event with callback function).
--- output_events: table of events emitted by the behavior.
+-- This function loads a behavior from a file.
+-- After loading the behaviors, add_behavior must be executed.
 
-M.new_behavior = function(behavior_desc)
-    if type (behavior_desc) == 'string' then 
-        local behavior_name = behavior_desc
-        local packagename = 'behaviors/'..behavior_name
+M.load_behavior = function(behavior_name)
+    local packagename = 'behaviors/'..behavior_name
 
-        local behavior_desc2 = require (packagename)
-        behavior_desc2.name = behavior_desc
-        behavior_desc = behavior_desc2
-    end
+    local behavior_desc = require (packagename)
+    behavior_desc.name = behavior_name
+    behavior_desc.output_targets = behavior_desc.output_targets or {}
 
-    -- add behavior to 'M.behaviors'
-    M.behaviors[behavior_desc.name] = { events = behavior_desc.events }
-    
-    -- emits new_behavior.
-    M.behaviors[behavior_desc.name].loaded = true
-    sched.signal(M.events.new_behavior,behavior_desc.name)
-
-    -- for each trigger of the behavior, ...
-    for trigger_name, trigger in pairs (behavior_desc.triggers) do 
-
-        -- registers the trigger events.
-        if trigger.event then
-            register_trigger (behavior_desc.name, trigger)
-        end
-    
---[[
-        -- method to update the trigger event.
-        local meta = getmetatable(trigger) or {}
-        meta.__newindex = function (table, key, value)
-            rawset(table, key, value)
-            if key == 'event' then
-                -- TODO: Do somehting if the trigger already had an event.
-                register_trigger (behavior_desc.name, table)
-            end
-        end
-        trigger = setmetatable(trigger, meta)
---]]
-    end
---[[
-    -- method to update an output event.
-    local meta = {
-        __newindex = function (table, key, value)
-            -- Proxy of the target function
-            local proxy = function(_, ...)
-                value(...)
-            end
-
-            local trigger = { 
-                event = { signal = behavior_desc.events[key], name = key },
-                callback = proxy
-            }
-
-            -- registers the (proxy) target function for the event.
-            register_trigger (value.emitter, trigger)
-        end
-    }
-    behavior_desc.output = setmetatable({}, meta)
---]]
     return behavior_desc
+end
+
+
+-- this function adds a behavior to Torocó.
+
+M.add_behavior = function (behavior)
+
+    local load_behavior = function()
+        -- add behavior to 'M.behaviors'
+        M.behaviors[behavior.name] = { events = behavior.events }
+
+        -- emits new_behavior.
+        M.behaviors[behavior.name].loaded = true
+        sched.signal (M.events.new_behavior, behavior.name)
+
+        -- register the triggers
+        for trigger_name, event in pairs(behavior.triggers) do
+            register_trigger (behavior.name, behavior.triggers[trigger_name])
+        end
+
+        -- register the output targets
+        for output_name, target in pairs(behavior.output_targets or {}) do
+            register_output_target (behavior.name, output_name, target)
+        end
+    
+        
+    end
+    sched.run(load_behavior)
 end
 
 
 -- Torocó main function
 
-M.run = function(main, toribio_conf_file)
+M.run = function(toribio_conf_file)
     if toribio_conf then
         M.load_configuration(toribio_conf_file)
     else
         M.load_configuration('toribio.conf')
     end
 
-    sched.run(main)
+    print ('Torocó go!')
+
     sched.loop()
 end
 
 
+-- This function loads the behaviors from the files,
+-- and then adds the behaviors to Torocó.
 
-M.run2 = function(behaviors, toribio_conf_file)
-    if toribio_conf then
-        M.load_configuration(toribio_conf_file)
-    else
-        M.load_configuration('toribio.conf')
-    end
+M.add_behaviors = function (behaviors)
 
     for behavior_name, behavior_table in pairs(behaviors) do
-        local load_behavior = function()
-            local behavior = M.new_behavior(behavior_name)
-            for trigger_name, event in pairs(behavior_table.triggers) do
-                behavior.triggers[trigger_name].event = event
-                register_trigger (behavior_name, behavior.triggers[trigger_name])
-            end
+        local behavior = M.load_behavior (behavior_name)
 
-            for output_name, target in pairs(behavior_table.output_targets or {}) do
-                register_output_target(behavior_name, output_name, target)
-            end
+        -- TODO: Error handling
+        for trigger_name, event in pairs(behavior_table.triggers) do
+            behavior.triggers[trigger_name].event = event
         end
-        sched.run(load_behavior)
-    end
 
-    sched.loop()
+        behavior.output_targets = behavior.output_targets or {}
+
+        for output_name, target in pairs(behavior_table.output_targets or {}) do
+            behavior.output_targets[output_name] = target
+        end
+
+        M.add_behavior(behavior)
+    end
 end
 
 -------------------------------------------------------------------------------

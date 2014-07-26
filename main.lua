@@ -2,24 +2,31 @@ local toroco = require 'toroco.toroco'
 local device = require 'toroco.device'
 local behavior = require 'toroco.behavior'
 
+-- Method 1: use load_behavior and add_behavior.
+
 --[[
-local main = function()
 
-    local trc_sender = toroco.new_behavior('trc_sender')
+local trc_sender = toroco.load_behavior ('trc_sender')
 
-    trc_sender.triggers.trigger1.event = device.mice.event.leftbutton
-    trc_sender.triggers.trigger2.event = device.mice.event.rightbutton
+trc_sender.triggers.trigger1.event = device.mice.event.leftbutton
+trc_sender.triggers.trigger2.event = device.mice.event.rightbutton
 
-    trc_sender.output.motor1_setvel = device.trc_motor.setvel2mtr
+trc_sender.output_targets.motor1_setvel = device.trc_motor.setvel2mtr
 
-    local trc_receiver = toroco.new_behavior('trc_receiver')
+toroco.add_behavior (trc_sender)
 
-    trc_receiver.triggers.trigger1.event = behavior.trc_sender.event.motor1_setvel
-    trc_receiver.triggers.trigger2.event = behavior.trc_sender.event.motor2_setvel
-end
+local trc_receiver = toroco.load_behavior ('trc_receiver')
+
+trc_receiver.triggers.trigger1.event = behavior.trc_sender.event.motor1_setvel
+trc_receiver.triggers.trigger2.event = behavior.trc_sender.event.motor2_setvel
+
+toroco.add_behavior (trc_receiver)
 
 --]]
 
+-- Method 2: use add_behaviors.
+
+---[[
 local behaviors = {
 
     trc_sender = {
@@ -44,8 +51,11 @@ local behaviors = {
 };
 
 
-toroco.run2(behaviors)
+toroco.add_behaviors (behaviors)
+--]]
 
---toroco.run(main)
+-- run toroco
+
+toroco.run ()
 
 
