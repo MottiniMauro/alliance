@@ -44,8 +44,7 @@ local behaviors = {
     trc_receiver = {
 
         triggers = {
-            trigger1 = behavior.trc_sender.event.motor1_setvel,
-            trigger2 = behavior.trc_sender.event.motor2_setvel
+            trigger1 = device.mice.event.rightbutton
         };
     };
 

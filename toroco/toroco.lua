@@ -17,7 +17,7 @@ require 'lumen.tasks.selector'.init({service='nixio'})
 
 M.behaviors = {}
 
---M.running_behavior = nil
+M.running_behavior = nil
 
 local events = {
 	new_behavior = {}
@@ -51,9 +51,13 @@ local dispatch_signal = function (event, ...)
             end
 
             if not receiver.inhibited then
-            
+                local prev_behavior = M.running_behavior
+                M.running_behavior = M.behaviors[receiver.name]
+
                 -- dispatch event to the receiver
                 receiver.callback(event, ...)
+
+                M.running_behavior = prev_behavior
             end
         end 
     end
@@ -62,7 +66,6 @@ end
 
 -- This function inhibits an event sent by a behavior.
 -- emitter: return value of wait_for_behavior or wait_for_device.
--- event_name: string
 -- timeout: number (optional)
 
 M.inhibit = function(emitter, event_name, timeout)
@@ -254,6 +257,19 @@ M.wait = function(waitd)
 end
 
 
+M.send_output = function(output_values)
+
+    assert(M.running_behavior, 'Must run in a behavior')
+
+    for event_name, event in pairs(M.running_behavior.events) do
+        if output_values[event_name] then
+            sched.signal (event, unpack(output_values[event_name]))
+        else
+            sched.signal (event)
+        end
+    end
+end
+
 -- suspend a task until the behavior has been registered to Torocó.
 
 M.wait_for_behavior = function(behavior_name, timeout)
@@ -317,7 +333,7 @@ M.add_behavior = function (behavior)
 
     local load_behavior = function()
         -- add behavior to 'M.behaviors'
-        M.behaviors[behavior.name] = { events = behavior.events }
+        M.behaviors[behavior.name] = { name = behavior.name, events = behavior.output_events }
 
         -- emits new_behavior.
         M.behaviors[behavior.name].loaded = true

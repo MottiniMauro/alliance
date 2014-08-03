@@ -11,20 +11,20 @@ M.triggers = {}
 -- /// Output events ///
 -- Events emitted by the module.
 
-M.events = {motors_setvel = {}}
+M.output_events = {motors_setvel = {}}
 
 
 -- /// Callback functions ///
 
 local callback1 = function(event, v) 
 	print (event .. '_left = ', v)
-    sched.signal (M.events.motors_setvel, 1, 0)
+    sched.signal (M.output_events.motors_setvel, 1, 0)
 end
 
 
 local callback2 = function(event, v) 
 	print (event .. '_right = ', v)
-    sched.signal (M.events.motors_setvel, 0, 1)
+    sched.signal (M.output_events.motors_setvel, 0, 1)
 end
 
 
