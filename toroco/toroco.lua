@@ -64,13 +64,58 @@ local dispatch_signal = function (event, ...)
 end
 
 
+local get_real_event = function(event_desc)
+    if event_desc.type == 'device' then
+
+        -- FIXME: emitter should be devicename not module name
+        local device = toribio.wait_for_device ({ module = event_desc.emitter })     
+        if not device.events or not device.events[event_desc.name] then 
+            log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(event_desc.name))
+        end
+
+        return device.events[event_desc.name]
+
+    elseif event_desc.type == 'behavior' then 
+
+        local behavior = M.wait_for_behavior (event_desc.emitter)     
+       
+        if not behavior.events or not behavior.events[event_desc.name] then 
+            log ('TOROCO', 'WARN', 'Event not found for behavior %s: "%s"', tostring(behavior), tostring(event_desc.name))
+        end
+
+        return behavior.events[event_desc.name]
+
+    elseif event_desc.type == 'function' then
+
+        local device = toribio.wait_for_device (event_desc.emitter)
+        
+        local event = {}
+        local value = nil
+
+        -- TODO: There should be only one polling function per target
+        local polling_function = function()
+            local new_value = device.get_value ();
+
+            if (new_value ~= value) then
+                value = new_value
+                sched.signal (event, new_value)
+            end
+        end
+
+        sched.sigrun ({ {}, timeout = 0.1 }, polling_function)
+
+        return event
+    end
+end
+
+
 -- This function inhibits an event sent by a behavior.
 -- emitter: return value of wait_for_behavior or wait_for_device.
 -- timeout: number (optional)
 
-M.inhibit = function(emitter, event_name, timeout)
+M.inhibit = function(event_desc, timeout)
 
-    local event = emitter.events [event_name]
+    local event = get_real_event(event_desc)
 
     -- if the event is not inhibited for longer than proposed, set the new time.
     -- if the event is inhibited for longer than proposed, do nothing.
@@ -91,9 +136,9 @@ end
 -- emitter: return value of wait_for_behavior or wait_for_device.
 -- event_name: string
 
-M.release_inhibition = function(emitter, event_name)
+M.release_inhibition = function(event_desc)
 
-    local event = emitter.events [event_name]
+    local event = get_real_event(event_desc)
 
     inhibited_events [event] = nil
 end
@@ -103,12 +148,12 @@ end
 -- event_name: string
 -- receiver_name: string
 
-M.suppress = function(emitter, event_name, receiver_name, timeout)
+M.suppress = function(event_desc, receiver_desc, timeout)
     
-    local event = emitter.events [event_name]
+    local event = get_real_event(event_desc)
 
     for _, receiver in ipairs(registered_receivers[event]) do
-        if receiver.name == receiver_name then
+        if receiver.name == receiver_desc.emitter then
             if timeout then
                 if not receiver.inhibited 
                 or not receiver.inhibited.expire_time 
@@ -127,12 +172,12 @@ end
 -- event_name: string
 -- receiver_name: string
 
-M.release_suppression = function(emitter, event_name, receiver_name)
+M.release_suppression = function(event_desc, receiver_desc)
     
-    local event = emitter.events [event_name]
+    local event = get_real_event(event_desc)
 
     for _, receiver in ipairs(registered_receivers[event]) do
-        if receiver.name == receiver_name then
+        if receiver.name == receiver_desc.emitter then
             receiver.inhibited = false;
         end
     end 
@@ -163,56 +208,12 @@ local register_dispatcher = function(event)
     sched.sigrun(waitd, fsynched)
 end
 
-local get_trigger_event = function(trigger)
-    if trigger.event.type == 'device' then
-
-        -- FIXME: emitter should be devicename not module name
-        local device = toribio.wait_for_device ({ module = trigger.event.emitter })     
-        if not device.events or not device.events[trigger.event.name] then 
-            log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(trigger.event.name))
-        end
-
-        return device.events[trigger.event.name]
-
-    elseif trigger.event.type == 'behavior' then 
-
-        local behavior = M.wait_for_behavior (trigger.event.emitter)     
-       
-        if not behavior.events or not behavior.events[trigger.event.name] then 
-            log ('TOROCO', 'WARN', 'Event not found for behavior %s: "%s"', tostring(behavior), tostring(trigger.event.name))
-        end
-
-        return behavior.events[trigger.event.name]
-
-    elseif trigger.event.type == 'function' then
-
-        local device = toribio.wait_for_device (trigger.event.emitter)
-        
-        local event = {}
-        local value = nil
-
-        -- TODO: There should be only one polling function per target
-        local polling_function = function()
-            local new_value = device.get_value ();
-
-            if (new_value ~= value) then
-                value = new_value
-                sched.signal (event, new_value)
-            end
-        end
-
-        sched.sigrun ({ {}, timeout = 0.1 }, polling_function)
-
-        return event
-    end
-end
-
 -- Stores the task for each event of the trigger in 'registered_receivers',
 -- and registers the event aliases for the trigger.
 
 local register_trigger = function(behavior_name, trigger)
 
-    local event = get_trigger_event(trigger)
+    local event = get_real_event(trigger.event)
 
     if not registered_receivers[event] then
         registered_receivers[event] = {}
@@ -348,9 +349,8 @@ M.add_behavior = function (behavior)
         for output_name, target in pairs(behavior.output_targets or {}) do
             register_output_target (behavior.name, output_name, target)
         end
-    
-        
     end
+
     sched.run(load_behavior)
 end
 

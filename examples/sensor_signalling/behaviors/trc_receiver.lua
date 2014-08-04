@@ -1,8 +1,8 @@
 -- /// trc_receiver ///
 
-local sched = require 'lumen.sched'
-local toribio = require 'toribio'
 local toroco = require 'toroco.toroco'
+local device = require 'toroco.device'
+local behavior = require 'toroco.behavior'
 
 local M = {}
 
@@ -19,17 +19,12 @@ M.output_events = {}
 
 local callback1 = function (event, value) 
 
-    -- local trc_sender = toroco.wait_for_behavior ('trc_sender')
-    -- toroco.inhibit (trc_sender, 'motor1_setvel')
-
-    local mice = toribio.wait_for_device ({module = 'mice'})
-
     if value then
-        --toroco.inhibit (mice, 'leftbutton', 4)
-        toroco.suppress (mice, 'leftbutton', 'trc_sender', 4)
+        --toroco.inhibit (device.mice.event.leftbutton, 4)
+        toroco.suppress (device.mice.event.leftbutton, behavior.trc_sender, 4)
     else
-        --toroco.release_inhibition (mice, 'leftbutton')
-        toroco.release_suppression (mice, 'leftbutton', 'trc_sender')
+        --toroco.release_inhibition (device.mice.event.leftbutton)
+        toroco.release_suppression (device.mice.event.leftbutton, behavior.trc_sender)
     end
 end
 
