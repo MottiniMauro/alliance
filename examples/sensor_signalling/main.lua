@@ -32,8 +32,8 @@ local behaviors = {
     trc_sender = {
 
         triggers = {
-            trigger1 = device.mice.event.leftbutton,
-            trigger2 = device.mice.event.rightbutton
+            trigger1 = device.mice.leftbutton,
+            trigger2 = device.mice.rightbutton
         };
 
         output_targets = {
@@ -44,7 +44,7 @@ local behaviors = {
     trc_receiver = {
 
         triggers = {
-            trigger1 = device.mice.event.rightbutton
+            trigger1 = device.mice.rightbutton
         };
     };
 

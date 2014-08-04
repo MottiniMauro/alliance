@@ -20,11 +20,11 @@ M.output_events = {}
 local callback1 = function (event, value) 
 
     if value then
-        --toroco.inhibit (device.mice.event.leftbutton, 4)
-        toroco.suppress (device.mice.event.leftbutton, behavior.trc_sender, 4)
+        --toroco.inhibit (device.mice.leftbutton, 4)
+        toroco.suppress (device.mice.leftbutton, behavior.trc_sender, 4)
     else
-        --toroco.release_inhibition (device.mice.event.leftbutton)
-        toroco.release_suppression (device.mice.event.leftbutton, behavior.trc_sender)
+        --toroco.release_inhibition (device.mice.leftbutton)
+        toroco.release_suppression (device.mice.leftbutton, behavior.trc_sender)
     end
 end
 

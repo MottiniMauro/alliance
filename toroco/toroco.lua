@@ -24,6 +24,8 @@ local events = {
 }
 M.events = events
 
+local polling_devices = {}
+
 -- List of registered receivers for each event
 
 local registered_receivers = {}
@@ -63,14 +65,83 @@ local dispatch_signal = function (event, ...)
     end
 end
 
+local wait_for_device = function(devdesc, timeout)
+	assert(sched.running_task, 'Must run in a task')
+	
+	local wait_until
+	if timeout then wait_until=sched.get_time() + timeout end
+	
+	local device_in_devices
+	
+	device_in_devices = function (dd)
+        if toribio.devices[dd] then
+            return toribio.devices[dd]
+        else
+		    for _, device in pairs(toribio.devices) do
+			    if device.module == dd then 
+                    return device 
+                end
+		    end
+        end
+	end
+
+	local in_devices=device_in_devices(devdesc)
+	if in_devices then 
+		return in_devices
+	else
+		local tortask = toribio.task
+		local waitd = {toribio.events.new_device}
+		if wait_until then waitd.timeout=wait_until-sched.get_time() end
+		while true do
+			local ev, device = sched.wait(waitd) 
+			if not ev then --timeout
+				return nil, 'timeout'
+			end
+			if device.name == devdesc or device.module == devdesc then
+				return device 
+			end
+			if wait_until then waitd.timeout=wait_until-sched.get_time() end
+		end
+	end
+	
+end
+
 
 local get_real_event = function(event_desc)
     if event_desc.type == 'device' then
-
         -- FIXME: emitter should be devicename not module name
-        local device = toribio.wait_for_device ({ module = event_desc.emitter })     
+        local device = wait_for_device (event_desc.emitter)     
+
         if not device.events or not device.events[event_desc.name] then 
-            log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(event_desc.name))
+
+            if device[event_desc.name] then
+                if polling_devices[event_desc.emitter] and polling_devices[event_desc.emitter][event_desc.name] then
+                    return polling_devices[event_desc.emitter].event
+                else
+                    local event = {}
+                    local value = nil
+                    -- TODO: There should be only one polling function per target
+                    local polling_function = function()
+                        local new_value = device[event_desc.name]();
+
+                        if (new_value ~= value) then
+                            value = new_value
+                            sched.signal (event, new_value)
+                        end
+                    end
+
+                    if not polling_devices[event_desc.emitter] then
+                        polling_devices[event_desc.emitter] = {}
+                    end
+                    polling_devices[event_desc.emitter][event_desc.name] = { event = event }
+
+                    sched.sigrun ({ {}, timeout = 0.1 }, polling_function)
+
+                    return event
+                end
+            else
+                log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(event_desc.name))
+            end
         end
 
         return device.events[event_desc.name]
@@ -84,27 +155,6 @@ local get_real_event = function(event_desc)
         end
 
         return behavior.events[event_desc.name]
-
-    elseif event_desc.type == 'function' then
-
-        local device = toribio.wait_for_device (event_desc.emitter)
-        
-        local event = {}
-        local value = nil
-
-        -- TODO: There should be only one polling function per target
-        local polling_function = function()
-            local new_value = device.get_value ();
-
-            if (new_value ~= value) then
-                value = new_value
-                sched.signal (event, new_value)
-            end
-        end
-
-        sched.sigrun ({ {}, timeout = 0.1 }, polling_function)
-
-        return event
     end
 end
 
