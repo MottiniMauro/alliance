@@ -4,17 +4,6 @@ local toroco = require 'toroco.toroco'
 local device = require 'toroco.device'
 local behavior = require 'toroco.behavior'
 
-local M = {}
-
-M.triggers = {}
-
-
--- /// Output events ///
--- Events emitted by the module.
-
-M.output_events = {}
-
-
 -- /// Callback functions ///
 
 local callback1 = function (event, value) 
@@ -33,10 +22,10 @@ local callback1 = function (event, value)
     end
 end
 
-
--- /// Triggers ///
-
-M.triggers.trigger1 = { callback = callback1 }
-
-
-return M
+return {
+    output_events = { }; 
+    
+    triggers = {
+        trigger1 = { callback = callback1 };
+    } 
+}
