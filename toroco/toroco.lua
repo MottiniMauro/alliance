@@ -38,21 +38,26 @@ local inhibited_events = {}
 local dispatch_signal = function (event, ...)
     
     -- inhibition
-    if inhibited_events [event] and inhibited_events [event].expire_time and inhibited_events [event].expire_time < sched.get_time() then
-        inhibited_events [event] = nil
+    for inhibitor, inhibition in pairs(inhibited_events [event]) do
+
+        if inhibition.expire_time and inhibition.expire_time < sched.get_time() then
+            inhibited_events [event] [inhibitor] = nil
+        end
     end
 
-    if not inhibited_events [event] then
+    if next(inhibited_events [event]) == nil then
 
         -- for each receiver, ...
         for _, receiver in ipairs (registered_receivers[event]) do
 
             -- suppression
-            if receiver.inhibited and receiver.inhibited.expire_time < sched.get_time() then
-                receiver.inhibited = nil
+            for inhibitor, inhibition in pairs(receiver.inhibited) do
+                if inhibition.expire_time < sched.get_time() then
+                    receiver.inhibited [inhibitor] = nil
+                end
             end
 
-            if not receiver.inhibited then
+            if next(receiver.inhibited) == nil then
                 local prev_behavior = M.running_behavior
                 M.running_behavior = M.behaviors[receiver.name]
 
@@ -176,14 +181,16 @@ M.inhibit = function(event_desc, timeout)
     -- if the event is inhibited for longer than proposed, do nothing.
     -- if there is no timeout, delete the expire time.
 
+    inhibited_events [event] = inhibited_events [event] or {}
+
     if timeout then
-        if not inhibited_events [event] 
-        or not inhibited_events [event].expire_time 
-        or inhibited_events [event].expire_time < sched.get_time() + timeout then
-            inhibited_events [event] = { expire_time = sched.get_time() + timeout }
+        if not inhibited_events [event] [M.running_behavior]
+        or not inhibited_events [event] [M.running_behavior].expire_time 
+        or inhibited_events [event] [M.running_behavior].expire_time < sched.get_time() + timeout then
+            inhibited_events [event] [M.running_behavior] = { expire_time = sched.get_time() + timeout }
         end
     else
-        inhibited_events [event] = { expire_time = nil }
+        inhibited_events [event] [M.running_behavior] = { expire_time = nil }
     end
 end
 
@@ -195,7 +202,7 @@ M.release_inhibition = function(event_desc)
 
     local event = get_real_event(event_desc)
 
-    inhibited_events [event] = nil
+    inhibited_events [event] [M.running_behavior] = nil
 end
 
 -- This function suppresses an event received by a behavior.
@@ -204,19 +211,22 @@ end
 -- receiver_name: string
 
 M.suppress = function(event_desc, receiver_desc, timeout)
-    
+
     local event = get_real_event(event_desc)
 
     for _, receiver in ipairs(registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
+
+            receiver.inhibited = receiver.inhibited or {}
+
             if timeout then
-                if not receiver.inhibited 
-                or not receiver.inhibited.expire_time 
-                or receiver.inhibited.expire_time < sched.get_time() + timeout then
-                    receiver.inhibited = { expire_time = sched.get_time() + timeout }
+                if not receiver.inhibited [M.running_behavior]
+                or not receiver.inhibited [M.running_behavior].expire_time 
+                or receiver.inhibited [M.running_behavior].expire_time < sched.get_time() + timeout then
+                    receiver.inhibited [M.running_behavior] = { expire_time = sched.get_time() + timeout }
                 end
             else
-                receiver.inhibited = { expire_time = nil }
+                receiver.inhibited [M.running_behavior] = { expire_time = nil }
             end
         end
     end 
@@ -233,7 +243,7 @@ M.release_suppression = function(event_desc, receiver_desc)
 
     for _, receiver in ipairs(registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
-            receiver.inhibited = false;
+            receiver.inhibited [M.running_behavior] = nil;
         end
     end 
 end
@@ -253,6 +263,9 @@ end
 -- Registers the dispatch signal function to an event
 
 local register_dispatcher = function(event)
+
+    inhibited_events [event] = inhibited_events [event] or {}
+
     local waitd = {
         event
     }
@@ -279,6 +292,7 @@ local register_trigger = function(behavior_name, trigger)
     -- initialize the receiver
     local receiver = {}
     receiver.name = behavior_name
+    receiver.inhibited = {}
     table.insert(registered_receivers[event], receiver)
     
     -- initialize callback

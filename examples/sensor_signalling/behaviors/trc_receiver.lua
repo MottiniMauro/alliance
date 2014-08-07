@@ -12,19 +12,19 @@ M.triggers = {}
 -- /// Output events ///
 -- Events emitted by the module.
 
-M.output_events = {}
+M.output_events = {motor1_setvel = {}}
 
 
 -- /// Callback functions ///
 
-local callback1 = function (event, value) 
+local callback1 = function (event, side, value)
 
     if value then
-        --toroco.inhibit (device.mice.leftbutton, 4)
-        toroco.suppress (device.mice.leftbutton, behavior.trc_sender, 4)
-    else
-        --toroco.release_inhibition (device.mice.leftbutton)
-        toroco.release_suppression (device.mice.leftbutton, behavior.trc_sender)
+        if side == 'left' then
+            toroco.send_output {motor1_setvel = {99, 0}}
+        else
+            toroco.send_output {motor1_setvel = {0, 99}}
+        end
     end
 end
 

@@ -9,26 +9,26 @@ M.triggers = {}
 -- /// Output events ///
 -- Events emitted by the module.
 
-M.output_events = {motor1_setvel = {}, motor2_setvel = {}}
+M.output_events = {repeater_event = {}}
 
 
 -- /// Callback functions ///
 
-local callback1 = function(event, v) 
+local callback_left = function(event, v) 
 	print (event, '=', v)
-    toroco.send_output {motor1_setvel = {1, 33}, motor2_setvel = {0, 99}}
+    toroco.send_output {repeater_event = {'left', v}}
 end
 
-local callback2 = function(event, v) 
+local callback_right = function(event, v) 
 	print (event, '=', v)
-    toroco.send_output {}
+    toroco.send_output {repeater_event = {'right', v}}
 end
 
 
 -- /// Triggers ///
 
-M.triggers.trigger1 = { callback = callback1 }
+M.triggers.trigger_left = { callback = callback_left }
 
-M.triggers.trigger2 = { callback = callback2 }
+M.triggers.trigger_right = { callback = callback_right }
 
 return M
