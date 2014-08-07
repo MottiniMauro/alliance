@@ -65,7 +65,7 @@ local dispatch_signal = function (event, ...)
     end
 end
 
-local wait_for_device = function(devdesc, timeout)
+local my_wait_for_device = function(devdesc, timeout)
 	assert(sched.running_task, 'Must run in a task')
 	
 	local wait_until
@@ -109,7 +109,12 @@ end
 
 local get_real_event = function(event_desc)
     if event_desc.type == 'device' then
-        -- FIXME: emitter should be devicename not module name
+        
+        local wait_for_device = my_wait_for_device
+        if type (event_desc.emitter) == 'table' then
+            wait_for_device = toribio.wait_for_device
+        end
+
         local device = wait_for_device (event_desc.emitter)     
 
         if not device.events or not device.events[event_desc.name] then 
