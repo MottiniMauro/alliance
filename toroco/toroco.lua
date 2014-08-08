@@ -2,7 +2,9 @@ package.path = package.path .. ";;;lumen/?.lua;toribio/?/init.lua;toribio/?.lua"
 
 local M = {}
 
+-- ****************
 -- *** Requires ***
+-- ****************
 
 local toribio = require 'toribio'
 local sched = require 'lumen.sched'
@@ -11,7 +13,9 @@ local log = require 'lumen.log'
 
 require 'lumen.tasks.selector'.init({service='nixio'})
 
+-- *****************
 -- *** Variables ***
+-- *****************
 
 -- Behaviors managed by Torocó
 
@@ -31,32 +35,38 @@ local polling_devices = {}
 local registered_receivers = {}
 local inhibited_events = {}
 
+-- *****************
 -- *** Functions ***
+-- *****************
 
 -- This function is executed when Torocó captures a signal.
+-- It resend the signal to all receivers which registered to the event,
+-- applying the inhibition and suppression restrictions.
 
 local dispatch_signal = function (event, ...)
     
-    -- inhibition
-    for inhibitor, inhibition in pairs(inhibited_events [event]) do
+    -- update inhibition
+    for inhibitor, inhibition in pairs (inhibited_events [event]) do
 
         if inhibition.expire_time and inhibition.expire_time < sched.get_time() then
             inhibited_events [event] [inhibitor] = nil
         end
     end
 
+    -- check inhibition
     if next(inhibited_events [event]) == nil then
 
-        -- for each receiver, ...
-        for _, receiver in ipairs (registered_receivers[event]) do
+        -- for each registered receiver of the event, ...
+        for _, receiver in ipairs (registered_receivers [event]) do
 
-            -- suppression
+            -- update inhibition
             for inhibitor, inhibition in pairs(receiver.inhibited) do
                 if inhibition.expire_time < sched.get_time() then
                     receiver.inhibited [inhibitor] = nil
                 end
             end
 
+            -- check inhibition
             if next(receiver.inhibited) == nil then
                 local prev_behavior = M.running_behavior
                 M.running_behavior = M.behaviors[receiver.name]
@@ -69,6 +79,8 @@ local dispatch_signal = function (event, ...)
         end 
     end
 end
+
+-- Torocó version of sched.wait_for_device().
 
 local my_wait_for_device = function(devdesc, timeout)
 	assert(sched.running_task, 'Must run in a task')
@@ -111,8 +123,13 @@ local my_wait_for_device = function(devdesc, timeout)
 	
 end
 
+-- returns the real event from a device or behavior.
+-- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
 
-local get_real_event = function(event_desc)
+local get_real_event = function (event_desc)
+
+	-- if the event is defined in a device, ...
+
     if event_desc.type == 'device' then
         
         local wait_for_device = my_wait_for_device
@@ -120,17 +137,25 @@ local get_real_event = function(event_desc)
             wait_for_device = toribio.wait_for_device
         end
 
-        local device = wait_for_device (event_desc.emitter)     
-
-        if not device.events or not device.events[event_desc.name] then 
-
+        local device = wait_for_device (event_desc.emitter)
+        
+        -- if the device does not have the event, ...
+        if not device.events or not device.events[event_desc.name] then
+        
+        	-- if the device has a function with that event, ...
             if device[event_desc.name] then
+            	
+            	-- return the event of the device polling function
                 if polling_devices[event_desc.emitter] and polling_devices[event_desc.emitter][event_desc.name] then
                     return polling_devices[event_desc.emitter].event
+                
+                -- create a new device polling function, and return the new event
                 else
+                	-- polling event
                     local event = {}
+                    
+                    -- polling function
                     local value = nil
-                    -- TODO: There should be only one polling function per target
                     local polling_function = function()
                         local new_value = device[event_desc.name]();
 
@@ -140,11 +165,13 @@ local get_real_event = function(event_desc)
                         end
                     end
 
+					-- store the polling event in polling_devices.
                     if not polling_devices[event_desc.emitter] then
                         polling_devices[event_desc.emitter] = {}
                     end
                     polling_devices[event_desc.emitter][event_desc.name] = { event = event }
 
+					-- start the polling function.
                     sched.sigrun ({ {}, timeout = 0.1 }, polling_function)
 
                     return event
@@ -154,8 +181,10 @@ local get_real_event = function(event_desc)
             end
         end
 
+        -- if the device has the event, return it.
         return device.events[event_desc.name]
 
+	-- if the event is defined in a behavior, ...
     elseif event_desc.type == 'behavior' then 
 
         local behavior = M.wait_for_behavior (event_desc.emitter)     
@@ -169,9 +198,12 @@ local get_real_event = function(event_desc)
 end
 
 
+-- /// Inhibit an event ///
 -- This function inhibits an event sent by a behavior.
--- emitter: return value of wait_for_behavior or wait_for_device.
--- timeout: number (optional)
+-- The inhibition is associated with the running behavior,
+-- and is independent of other inhibitions to the same event that were set by other behaviors.
+-- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
+-- timeout: number of seconds (optional)
 
 M.inhibit = function(event_desc, timeout)
 
@@ -194,27 +226,32 @@ M.inhibit = function(event_desc, timeout)
     end
 end
 
--- This function releases an inhibition.
--- emitter: return value of wait_for_behavior or wait_for_device.
--- event_name: string
+-- /// Release an inhibition to an event ///
+-- This function releases an inhibition to an event.
+-- The released inhibition is the one associated with the running behavior,
+-- and is independent of other inhibitions to the same event that were set by other behaviors.
+-- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
 
-M.release_inhibition = function(event_desc)
+M.release_inhibition = function (event_desc)
 
-    local event = get_real_event(event_desc)
+    local event = get_real_event (event_desc)
 
     inhibited_events [event] [M.running_behavior] = nil
 end
 
--- This function suppresses an event received by a behavior.
--- emitter: return value of wait_for_behavior or wait_for_device.
--- event_name: string
--- receiver_name: string
+-- /// Suppress an event ///
+-- This function suppresses an event received by a specific behavior.
+-- The suppression is associated with the running behavior,
+-- and is independent of other suppressions to the same event that were set by other behaviors.
+-- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
+-- receiver_desc: receiver descriptor (return value of /toroco/behavior)
+-- timeout: number of seconds (optional)
 
-M.suppress = function(event_desc, receiver_desc, timeout)
+M.suppress = function (event_desc, receiver_desc, timeout)
 
     local event = get_real_event(event_desc)
 
-    for _, receiver in ipairs(registered_receivers[event]) do
+    for _, receiver in ipairs (registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
 
             receiver.inhibited = receiver.inhibited or {}
@@ -232,24 +269,26 @@ M.suppress = function(event_desc, receiver_desc, timeout)
     end 
 end
 
--- This function releases a suppression.
--- emitter: return value of wait_for_behavior or wait_for_device.
--- event_name: string
--- receiver_name: string
+-- /// Release a suppression to an event ///
+-- This function releases a suppression to an event for a specific behavior.
+-- The released suppression is the one associated with the running behavior,
+-- and is independent of other inhibitions to the same event that were set by other behaviors.
+-- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
+-- receiver_desc: receiver descriptor (return value of /toroco/behavior)
 
-M.release_suppression = function(event_desc, receiver_desc)
+M.release_suppression = function (event_desc, receiver_desc)
     
-    local event = get_real_event(event_desc)
+    local event = get_real_event (event_desc)
 
-    for _, receiver in ipairs(registered_receivers[event]) do
+    for _, receiver in ipairs (registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
             receiver.inhibited [M.running_behavior] = nil;
         end
     end 
 end
 
--- Registers the events that a behavior wants to receive.
--- The data is stored in receivers_events.
+-- returns the task name.
+-- conf: configuration table of the task.
 
 local get_task_name = function(conf)
     local config = toribio.configuration['tasks'] or {}    
@@ -261,6 +300,7 @@ local get_task_name = function(conf)
 end
 
 -- Registers the dispatch signal function to an event
+-- event: event to be registered.
 
 local register_dispatcher = function(event)
 
@@ -326,14 +366,23 @@ M.wait = function(waitd)
     
 end
 
+-- /// Send the behavior output ///
+-- This function sends the output of a behavior, that is,
+-- it sends a signal for each output event of the behavior.
+-- output_value: table with the extra parameters for each signal.
 
 M.send_output = function(output_values)
 
     assert(M.running_behavior, 'Must run in a behavior')
 
+	-- for each event of the behavior, ...
     for event_name, event in pairs(M.running_behavior.events) do
+    
+    	-- send a signal for the event, with the extra parameters
         if output_values[event_name] then
             sched.signal (event, unpack(output_values[event_name]))
+            
+    	-- send a signal for the event, with no extra parameters
         else
             sched.signal (event)
         end
@@ -397,7 +446,9 @@ M.load_behavior = function(behavior_name)
 end
 
 
--- this function adds a behavior to Torocó.
+-- /// Add behavior to Torocó. ///
+-- This function adds a behavior to Torocó.
+-- behavior: table with name, output_events, output_targets and triggers.
 
 M.add_behavior = function (behavior)
 
@@ -425,6 +476,7 @@ end
 
 
 -- Torocó main function
+-- toribio_conf_file: configuration filename (optional).
 
 M.run = function(toribio_conf_file)
     if toribio_conf then
@@ -439,32 +491,43 @@ M.run = function(toribio_conf_file)
 end
 
 
+-- /// Add behaviors to Torocó. ///
 -- This function loads the behaviors from the files,
 -- and then adds the behaviors to Torocó.
+-- behaviors: table with behavior data.
+-- each behavior has triggers and output_targets.
 
 M.add_behaviors = function (behaviors)
 
+	-- for each behavior in the table, ...
     for behavior_name, behavior_table in pairs(behaviors) do
+    
+    	-- load behavior table
         local behavior = M.load_behavior (behavior_name)
 
         -- TODO: Error handling
+        
+		-- add triggers to the behavior table.
         for trigger_name, event in pairs(behavior_table.triggers) do
             behavior.triggers[trigger_name].event = event
         end
 
+		-- add output_targets to the behavior table.
         behavior.output_targets = behavior.output_targets or {}
 
         for output_name, target in pairs(behavior_table.output_targets or {}) do
             behavior.output_targets[output_name] = target
         end
 
+		-- add behavior to Torocó.
         M.add_behavior(behavior)
     end
 end
 
 -------------------------------------------------------------------------------
 
--- load toribio.conf
+-- load Torocó configuration file.
+-- file: configuration filename.
 
 M.load_configuration = function(file)
 	local func_conf, err = loadfile(file)
