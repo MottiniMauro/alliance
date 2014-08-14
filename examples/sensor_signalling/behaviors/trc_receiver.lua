@@ -4,7 +4,7 @@ local toroco = require 'toroco.toroco'
 
 -- /// Callback functions ///
 
-local callback1 = function (event, side, value)
+local handler1 = function (event, side, value)
 
     if value then
         if side == 'left' then
@@ -18,7 +18,7 @@ end
 return {
     output_events = { motor1_setvel = {} }; 
     
-    triggers = {
-        trigger1 = { callback = callback1 };
+    input_handlers = {
+        trigger1 = handler1;
     } 
 }

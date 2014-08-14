@@ -7,7 +7,7 @@ local behaviors = {
 
     trc_sender = {
 
-        triggers = {
+        input_sources = {
             trigger_left = device.mice.leftbutton,
             trigger_right = device.mice.rightbutton
         };
@@ -15,7 +15,7 @@ local behaviors = {
 
     trc_receiver = {
 
-        triggers = {
+        input_sources = {
             trigger1 = behavior.trc_sender.repeater_event
         };
 

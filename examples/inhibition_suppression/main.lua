@@ -8,7 +8,7 @@ local behavior = require 'toroco.behavior'
 
 local trc_level1 = toroco.load_behavior ('trc_level1')
 
-trc_level1.triggers.trigger1.event = device.mice.leftbutton
+trc_level1.input_sources.trigger1 = device.mice.leftbutton
 
 trc_level1.output_targets.motor1_setvel = device.trc_motor.setvel2mtr
 
@@ -16,7 +16,7 @@ toroco.add_behavior (trc_level1)
 
 local trc_level2 = toroco.load_behavior ('trc_level2')
 
-trc_level2.triggers.trigger1.event = behavior.trc_level1.motor1_setvel
+trc_level2.input_sources.trigger1 = behavior.trc_level1.motor1_setvel
 
 toroco.add_behavior (trc_level2)
 
@@ -34,16 +34,16 @@ local trc_level1 = {
         motor1_setvel = device.trc_motor.setvel2mtr
     };
     
-    triggers = {
-        trigger1 = { 
-            event = device.mice.leftbutton;
-                     
-            callback = function (event, value) 
-	            print (event, '=', value)
-                toroco.send_output {motor1_setvel = {1, 33}, motor2_setvel = {0, 99}}
-            end
-        };
-    } 
+    input_sources = {    
+        trigger1 = device.mice.rightbutton;
+    };
+
+    input_handlers = {
+        trigger1 = function (event, value) 
+            print (event, '=', value)
+            toroco.send_output {motor1_setvel = {1, 33}, motor2_setvel = {0, 99}}
+        end
+    };
 }
 toroco.add_behavior (trc_level1)
 
@@ -52,24 +52,24 @@ local trc_level2 = {
 
     output_events = { }; 
     
-    triggers = {
-        trigger1 = { 
-            event = device.mice.rightbutton;
-                     
-            callback = function (event, value)
-                if value then
-                    print ('inhibition started')        
-                    toroco.inhibit (device.mice.leftbutton, 4)
-                    --toroco.suppress (device.mice.leftbutton, behavior.trc_sender, 4)
+    input_sources = {    
+        trigger1 = device.mice.rightbutton;
+    };
 
-                else
-                    print ('inhibition released')   
-                    toroco.release_inhibition (device.mice.leftbutton)
-                    --toroco.release_suppression (device.mice.leftbutton, behavior.trc_sender)
-                end
+    input_handlers = {
+        trigger1 = function (event, value)
+            if value then
+                print ('inhibition started')        
+                toroco.inhibit (device.mice.leftbutton, 4)
+                --toroco.suppress (device.mice.leftbutton, behavior.trc_sender, 4)
+
+            else
+                print ('inhibition released')   
+                toroco.release_inhibition (device.mice.leftbutton)
+                --toroco.release_suppression (device.mice.leftbutton, behavior.trc_sender)
             end
-        };
-    } 
+        end
+    };
 }
 toroco.add_behavior (trc_level2)
 
@@ -81,7 +81,7 @@ local behaviors = {
 
     trc_level1 = {
 
-        triggers = {
+        input_sources = {
             trigger1 = device.mice.leftbutton
         };
 
@@ -92,7 +92,7 @@ local behaviors = {
 
     trc_level2 = {
 
-        triggers = {
+        input_sources = {
             trigger1 = device.mice.rightbutton
         };
     };

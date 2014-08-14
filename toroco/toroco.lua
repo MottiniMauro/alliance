@@ -11,6 +11,10 @@ local sched = require 'lumen.sched'
 local mutex = require 'lumen.mutex'
 local log = require 'lumen.log'
 
+M.input = require 'toroco.input'
+M.device = require 'toroco.device'
+M.behavior = require 'toroco.behavior'
+
 require 'lumen.tasks.selector'.init({service='nixio'})
 
 -- *****************
@@ -71,8 +75,16 @@ local dispatch_signal = function (event, ...)
                 local prev_behavior = M.running_behavior
                 M.running_behavior = M.behaviors[receiver.name]
 
+                -- if the receiver is a callback,
                 -- dispatch event to the receiver
-                receiver.callback(event, ...)
+                if receiver.callback then
+                    receiver.callback(event, ...)
+                    sched.wait()
+
+                -- if the receiver is a wait_for_input, ...
+                elseif receiver.event_alias then
+                    sched.signal (receiver.event_alias, ...)
+                end
 
                 M.running_behavior = prev_behavior
             end
@@ -316,29 +328,25 @@ local register_dispatcher = function(event)
     sched.sigrun(waitd, fsynched)
 end
 
--- Stores the task for each event of the trigger in 'registered_receivers',
--- and registers the event aliases for the trigger.
+-- Stores the task for the event of the inputs in 'registered_receivers',
+-- and registers the event aliases for the input.
 
-local register_trigger = function(behavior_name, trigger)
+local register_handler = function(behavior_name, input_source, input_handler)
 
-    local event = get_real_event(trigger.event)
+    local event = get_real_event(input_source)
 
-    if not registered_receivers[event] then
-        registered_receivers[event] = {}
-
-        register_dispatcher (event)
-    end
-
-    -- initialize the receiver
+    -- initialize the callback receiver
     local receiver = {}
     receiver.name = behavior_name
     receiver.inhibited = {}
-    table.insert(registered_receivers[event], receiver)
+
+    -- add the receiver to registered_receivers
+    table.insert (registered_receivers[event], receiver)
     
-    -- initialize callback
+    -- initialize the callback function
     local mx = mutex.new()
     local fsynched = mx:synchronize (function(_, ...)
-            trigger.callback(trigger.event.name, ...)
+            input_handler(input_source.name, ...)
         end
     )
     receiver.callback = fsynched
@@ -351,19 +359,49 @@ local register_output_target = function(behavior_name, output_name, target)
         target(...)
     end
 
-    local trigger = { 
-        event = { type = 'behavior', emitter = behavior_name, name = output_name },
-        callback = proxy
-    }
+    local input_source = { type = 'behavior', emitter = behavior_name, name = output_name }
+    local input_handler = proxy
+
+    -- initialize the dispatcher 
+    local event = get_real_event(input_source)
+
+    if not registered_receivers[event] then
+        registered_receivers[event] = {}
+
+        register_dispatcher (event)
+    end
 
     -- registers the (proxy) target function for the event.
-    register_trigger (target.emitter, trigger)
+    register_handler (target.emitter, input_source, input_handler)
 end
 
 -- mystic function
 
-M.wait = function(waitd)
-    
+M.wait_for_input = function(input_desc, timeout)
+
+    -- get event
+    local input_source = M.behaviors [M.running_behavior.name].input_sources [input_desc.name]
+    local event = get_real_event (input_source)
+
+    -- initialize the waiting receiver
+    local receiver = {}
+    receiver.name = M.running_behavior.name
+    receiver.event_alias = {}
+    receiver.inhibited = {}
+
+    -- add the receiver to registered_receivers
+    table.insert (registered_receivers [event], receiver)
+
+    -- initialize the waiting function
+    local waitd = {
+		receiver.event_alias,
+		timeout = timeout,
+	}
+
+    local f = function(_, ...)
+        return ...
+    end
+    return f(sched.wait(waitd)) 
 end
 
 -- /// Send the behavior output ///
@@ -448,21 +486,33 @@ end
 
 -- /// Add behavior to Torocó. ///
 -- This function adds a behavior to Torocó.
--- behavior: table with name, output_events, output_targets and triggers.
+-- behavior: table with name, output_events, output_targets, input_sources and input_handlers.
 
 M.add_behavior = function (behavior)
 
     local load_behavior = function()
         -- add behavior to 'M.behaviors'
-        M.behaviors[behavior.name] = { name = behavior.name, events = behavior.output_events }
+        M.behaviors[behavior.name] = { name = behavior.name, events = behavior.output_events, input_sources = behavior.input_sources }
 
         -- emits new_behavior.
         M.behaviors[behavior.name].loaded = true
         sched.signal (M.events.new_behavior, behavior.name)
 
-        -- register the triggers
-        for trigger_name, event in pairs(behavior.triggers) do
-            register_trigger (behavior.name, behavior.triggers[trigger_name])
+        -- initialize the dispatcher 
+        for _, input_source in pairs (behavior.input_sources) do
+        
+            local event = get_real_event (input_source)
+
+            if not registered_receivers[event] then
+                registered_receivers[event] = {}
+
+                register_dispatcher (event)
+            end
+        end
+
+        -- register the handlers
+        for input_name, handler in pairs(behavior.input_handlers) do
+            register_handler (behavior.name, behavior.input_sources[input_name], behavior.input_handlers[input_name])
         end
 
         -- register the output targets
@@ -495,7 +545,6 @@ end
 -- This function loads the behaviors from the files,
 -- and then adds the behaviors to Torocó.
 -- behaviors: table with behavior data.
--- each behavior has triggers and output_targets.
 
 M.add_behaviors = function (behaviors)
 
@@ -507,9 +556,11 @@ M.add_behaviors = function (behaviors)
 
         -- TODO: Error handling
         
-		-- add triggers to the behavior table.
-        for trigger_name, event in pairs(behavior_table.triggers) do
-            behavior.triggers[trigger_name].event = event
+		-- add input_sources to the behavior table.
+        behavior.input_sources = behavior.input_sources or {}
+
+        for input_name, event_source in pairs (behavior_table.input_sources) do
+            behavior.input_sources [input_name] = event_source
         end
 
 		-- add output_targets to the behavior table.
@@ -550,7 +601,7 @@ M.load_configuration = function(file)
 	        for task, conf in pairs(toribio.configuration[section] or {}) do
 		        log ('TORIBIOGO', 'DETAIL', 'Processing conf %s %s: %s', section, task, tostring((conf and conf.load) or false))
 
-		        if conf and conf.load==true then
+		        if conf and conf.load then
 			        --[[
 			        local taskmodule = require (section..'/'..task)
 			        if taskmodule.start then

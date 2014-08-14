@@ -4,9 +4,9 @@ local toroco = require 'toroco.toroco'
 local device = require 'toroco.device'
 local behavior = require 'toroco.behavior'
 
--- /// Callback functions ///
+-- /// Handler functions ///
 
-local callback1 = function (event, value) 
+local handler1 = function (event, value) 
 
     if value then
         print ('inhibition started')        
@@ -25,7 +25,7 @@ end
 return {
     output_events = { }; 
     
-    triggers = {
-        trigger1 = { callback = callback1 };
+    input_handlers = {
+        trigger1 = handler1;
     } 
 }
