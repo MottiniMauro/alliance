@@ -1,6 +1,6 @@
 local toroco = require 'toroco.toroco'
-local device = require 'toroco.device'
-local behavior = require 'toroco.behavior'
+local device = toroco.device
+local behavior = toroco.behavior
 
 -- Method 1: use load_behavior and add_behavior.
 
@@ -16,14 +16,14 @@ toroco.add_behavior (trc_level1)
 
 local trc_level2 = toroco.load_behavior ('trc_level2')
 
-trc_level2.input_sources.trigger1 = behavior.trc_level1.motor1_setvel
+trc_level2.input_sources.trigger1 = device.mice.rightbutton
 
 toroco.add_behavior (trc_level2)
 
 --]]
 
 -- Method 2
----[[
+--[[
 
 local trc_level1 = {
     name = 'trc_level1';
@@ -35,7 +35,7 @@ local trc_level1 = {
     };
     
     input_sources = {    
-        trigger1 = device.mice.rightbutton;
+        trigger1 = device.mice.leftbutton;
     };
 
     input_handlers = {
@@ -76,7 +76,7 @@ toroco.add_behavior (trc_level2)
 --]]
 
 -- Method 3: use add_behaviors.
---[[
+---[[
 local behaviors = {
 
     trc_level1 = {

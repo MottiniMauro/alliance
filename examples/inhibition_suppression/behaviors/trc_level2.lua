@@ -1,17 +1,18 @@
 -- /// trc_level2 ///
 
 local toroco = require 'toroco.toroco'
-local device = require 'toroco.device'
-local behavior = require 'toroco.behavior'
+local device = toroco.device
+local behavior = toroco.behavior
 
 -- /// Handler functions ///
 
 local handler1 = function (event, value) 
+	print (' ')
 
     if value then
         print ('inhibition started')        
 
-        toroco.inhibit (device.mice.leftbutton, 4)
+        toroco.inhibit (device.mice.leftbutton, 2.5)
         --toroco.suppress (device.mice.leftbutton, behavior.trc_sender, 4)
 
     else

@@ -4,12 +4,14 @@ local toroco = require 'toroco.toroco'
 
 -- /// Handler functions ///
 
-local handler_left = function(event, v) 
+local handler_left = function(event, v)
+	print (' ')
 	print (event, '=', v)
     toroco.send_output {repeater_event = {'left', v}}
 end
 
 local handler_right = function(event, v) 
+	print (' ')
 	print (event, '=', v)
     toroco.send_output {repeater_event = {'right', v}}
 end

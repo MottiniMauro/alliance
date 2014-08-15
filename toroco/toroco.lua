@@ -26,6 +26,7 @@ require 'lumen.tasks.selector'.init({service='nixio'})
 M.behaviors = {}
 
 M.running_behavior = nil
+local prev_behavior = nil
 
 local events = {
 	new_behavior = {}
@@ -48,7 +49,9 @@ local inhibited_events = {}
 -- applying the inhibition and suppression restrictions.
 
 local dispatch_signal = function (event, ...)
-    
+
+    registered_receivers [event].mutex:acquire()
+
     -- update inhibition
     for inhibitor, inhibition in pairs (inhibited_events [event]) do
 
@@ -61,7 +64,7 @@ local dispatch_signal = function (event, ...)
     if next(inhibited_events [event]) == nil then
 
         -- for each registered receiver of the event, ...
-        for _, receiver in ipairs (registered_receivers [event]) do
+        for key, receiver in ipairs (registered_receivers [event]) do
 
             -- update inhibition
             for inhibitor, inhibition in pairs(receiver.inhibited) do
@@ -72,24 +75,18 @@ local dispatch_signal = function (event, ...)
 
             -- check inhibition
             if next(receiver.inhibited) == nil then
-                local prev_behavior = M.running_behavior
-                M.running_behavior = M.behaviors[receiver.name]
 
-                -- if the receiver is a callback,
-                -- dispatch event to the receiver
-                if receiver.callback then
-                    receiver.callback(event, ...)
-                    sched.wait()
+                -- send alias signal
+                sched.signal (receiver.event_alias, ...)
 
-                -- if the receiver is a wait_for_input, ...
-                elseif receiver.event_alias then
-                    sched.signal (receiver.event_alias, ...)
+                if receiver.execute_once then
+                    table.remove(registered_receivers [event], key)
                 end
-
-                M.running_behavior = prev_behavior
             end
         end 
     end
+
+    registered_receivers [event].mutex:release()
 end
 
 -- Torocó version of sched.wait_for_device().
@@ -322,10 +319,7 @@ local register_dispatcher = function(event)
         event
     }
 
-    local mx = mutex.new()
-    local fsynched = mx:synchronize (dispatch_signal)
-
-    sched.sigrun(waitd, fsynched)
+    sched.sigrun(waitd, dispatch_signal)
 end
 
 -- Stores the task for the event of the inputs in 'registered_receivers',
@@ -338,19 +332,30 @@ local register_handler = function(behavior_name, input_source, input_handler)
     -- initialize the callback receiver
     local receiver = {}
     receiver.name = behavior_name
+    receiver.event_alias = {}
     receiver.inhibited = {}
 
     -- add the receiver to registered_receivers
+    registered_receivers [event].mutex:acquire()
     table.insert (registered_receivers[event], receiver)
-    
+    registered_receivers [event].mutex:release()
+
     -- initialize the callback function
     local mx = mutex.new()
     local fsynched = mx:synchronize (function(_, ...)
+            prev_behavior = M.running_behavior
+            M.running_behavior = M.behaviors[receiver.name]
+
             input_handler(input_source.name, ...)
+
+            M.running_behavior = prev_behavior
         end
     )
-    receiver.callback = fsynched
 
+    local waitd = {
+		receiver.event_alias
+	}
+    sched.sigrun(waitd, fsynched)
 end 
 
 
@@ -366,7 +371,7 @@ local register_output_target = function(behavior_name, output_name, target)
     local event = get_real_event(input_source)
 
     if not registered_receivers[event] then
-        registered_receivers[event] = {}
+        registered_receivers[event] = {mutex = mutex.new()}
 
         register_dispatcher (event)
     end
@@ -388,9 +393,12 @@ M.wait_for_input = function(input_desc, timeout)
     receiver.name = M.running_behavior.name
     receiver.event_alias = {}
     receiver.inhibited = {}
+    receiver.execute_once = true
 
     -- add the receiver to registered_receivers
+    registered_receivers [event].mutex:acquire()
     table.insert (registered_receivers [event], receiver)
+    registered_receivers [event].mutex:release()
 
     -- initialize the waiting function
     local waitd = {
@@ -399,8 +407,13 @@ M.wait_for_input = function(input_desc, timeout)
 	}
 
     local f = function(_, ...)
+        prev_behavior = M.running_behavior
+        M.running_behavior = M.behaviors[receiver.name]
         return ...
     end
+
+    M.running_behavior = prev_behavior
+
     return f(sched.wait(waitd)) 
 end
 
@@ -479,6 +492,7 @@ M.load_behavior = function(behavior_name)
     local behavior_desc = require (packagename)
     behavior_desc.name = behavior_name
     behavior_desc.output_targets = behavior_desc.output_targets or {}
+    behavior_desc.input_sources = behavior_desc.input_sources or {}
 
     return behavior_desc
 end
@@ -504,7 +518,7 @@ M.add_behavior = function (behavior)
             local event = get_real_event (input_source)
 
             if not registered_receivers[event] then
-                registered_receivers[event] = {}
+                registered_receivers[event] = {mutex = mutex.new()}
 
                 register_dispatcher (event)
             end

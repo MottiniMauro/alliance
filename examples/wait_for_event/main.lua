@@ -12,7 +12,8 @@ local behaviors = {
 
         input_sources = {
             gate_1 = device.mice.leftbutton,
-            gate_2 = device.mice.rightbutton
+            gate_2 = device.mice.leftbutton,
+            reset = device.mice.rightbutton
         };
     };
 };
