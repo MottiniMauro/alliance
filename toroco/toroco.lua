@@ -25,8 +25,7 @@ require 'lumen.tasks.selector'.init({service='nixio'})
 
 M.behaviors = {}
 
-M.running_behavior = nil
-local prev_behavior = nil
+M.behavior_taskd = {}
 
 local events = {
 	new_behavior = {}
@@ -225,13 +224,13 @@ M.inhibit = function(event_desc, timeout)
     inhibited_events [event] = inhibited_events [event] or {}
 
     if timeout then
-        if not inhibited_events [event] [M.running_behavior]
-        or not inhibited_events [event] [M.running_behavior].expire_time 
-        or inhibited_events [event] [M.running_behavior].expire_time < sched.get_time() + timeout then
-            inhibited_events [event] [M.running_behavior] = { expire_time = sched.get_time() + timeout }
+        if not inhibited_events [event] [M.behavior_taskd [sched.running_task]]
+        or not inhibited_events [event] [M.behavior_taskd [sched.running_task]].expire_time 
+        or inhibited_events [event] [M.behavior_taskd [sched.running_task]].expire_time < sched.get_time() + timeout then
+            inhibited_events [event] [M.behavior_taskd [sched.running_task]] = { expire_time = sched.get_time() + timeout }
         end
     else
-        inhibited_events [event] [M.running_behavior] = { expire_time = nil }
+        inhibited_events [event] [M.behavior_taskd [sched.running_task]] = { expire_time = nil }
     end
 end
 
@@ -245,7 +244,7 @@ M.release_inhibition = function (event_desc)
 
     local event = get_real_event (event_desc)
 
-    inhibited_events [event] [M.running_behavior] = nil
+    inhibited_events [event] [M.behavior_taskd [sched.running_task]] = nil
 end
 
 -- /// Suppress an event ///
@@ -266,13 +265,13 @@ M.suppress = function (event_desc, receiver_desc, timeout)
             receiver.inhibited = receiver.inhibited or {}
 
             if timeout then
-                if not receiver.inhibited [M.running_behavior]
-                or not receiver.inhibited [M.running_behavior].expire_time 
-                or receiver.inhibited [M.running_behavior].expire_time < sched.get_time() + timeout then
-                    receiver.inhibited [M.running_behavior] = { expire_time = sched.get_time() + timeout }
+                if not receiver.inhibited [M.behavior_taskd [sched.running_task]]
+                or not receiver.inhibited [M.behavior_taskd [sched.running_task]].expire_time 
+                or receiver.inhibited [M.behavior_taskd [sched.running_task]].expire_time < sched.get_time() + timeout then
+                    receiver.inhibited [M.behavior_taskd [sched.running_task]] = { expire_time = sched.get_time() + timeout }
                 end
             else
-                receiver.inhibited [M.running_behavior] = { expire_time = nil }
+                receiver.inhibited [M.behavior_taskd [sched.running_task]] = { expire_time = nil }
             end
         end
     end 
@@ -291,7 +290,7 @@ M.release_suppression = function (event_desc, receiver_desc)
 
     for _, receiver in ipairs (registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
-            receiver.inhibited [M.running_behavior] = nil;
+            receiver.inhibited [M.behavior_taskd [sched.running_task]] = nil;
         end
     end 
 end
@@ -343,19 +342,23 @@ local register_handler = function(behavior_name, input_source, input_handler)
     -- initialize the callback function
     local mx = mutex.new()
     local fsynched = mx:synchronize (function(_, ...)
-            prev_behavior = M.running_behavior
-            M.running_behavior = M.behaviors[receiver.name]
-
             input_handler(input_source.name, ...)
-
-            M.running_behavior = prev_behavior
         end
     )
 
     local waitd = {
 		receiver.event_alias
 	}
-    sched.sigrun(waitd, fsynched)
+
+ 	local taskd = sched.new_task( function()
+		while true do
+			fsynched(sched.wait(waitd))
+		end
+	end)
+
+    M.behavior_taskd [taskd] = M.behaviors[behavior_name]
+
+    sched.set_pause (taskd, false)
 end 
 
 
@@ -385,12 +388,12 @@ end
 M.wait_for_input = function(input_desc, timeout)
 
     -- get event
-    local input_source = M.behaviors [M.running_behavior.name].input_sources [input_desc.name]
+    local input_source = M.behaviors [M.behavior_taskd [sched.running_task].name].input_sources [input_desc.name]
     local event = get_real_event (input_source)
 
     -- initialize the waiting receiver
     local receiver = {}
-    receiver.name = M.running_behavior.name
+    receiver.name = M.behavior_taskd [sched.running_task].name
     receiver.event_alias = {}
     receiver.inhibited = {}
     receiver.execute_once = true
@@ -407,12 +410,8 @@ M.wait_for_input = function(input_desc, timeout)
 	}
 
     local f = function(_, ...)
-        prev_behavior = M.running_behavior
-        M.running_behavior = M.behaviors[receiver.name]
         return ...
     end
-
-    M.running_behavior = prev_behavior
 
     return f(sched.wait(waitd)) 
 end
@@ -424,10 +423,10 @@ end
 
 M.send_output = function(output_values)
 
-    assert(M.running_behavior, 'Must run in a behavior')
+    assert(M.behavior_taskd [sched.running_task], 'Must run in a behavior')
 
 	-- for each event of the behavior, ...
-    for event_name, event in pairs(M.running_behavior.events) do
+    for event_name, event in pairs(M.behavior_taskd [sched.running_task].events) do
     
     	-- send a signal for the event, with the extra parameters
         if output_values[event_name] then
@@ -439,6 +438,32 @@ M.send_output = function(output_values)
         end
     end
 end
+
+M.behavior_name = nil
+
+M.add_coroutine = function (arg1, arg2) 
+
+    local coroutine
+
+    if type (arg1) == 'function' then
+        coroutine = arg1
+        behavior_name =  M.behavior_name
+    else
+        coroutine = arg2
+        behavior_name = arg1.emitter
+    end
+
+    sched.run(function()
+        local taskd = sched.new_task(coroutine)
+
+        M.wait_for_behavior(behavior_name)
+
+        M.behavior_taskd [taskd] = M.behaviors[behavior_name]
+
+        sched.set_pause (taskd, false)
+    end)
+end
+
 
 -- suspend a task until the behavior has been registered to Torocó.
 
@@ -488,6 +513,8 @@ end
 
 M.load_behavior = function(behavior_name)
     local packagename = 'behaviors/'..behavior_name
+
+    M.behavior_name = behavior_name
 
     local behavior_desc = require (packagename)
     behavior_desc.name = behavior_name
