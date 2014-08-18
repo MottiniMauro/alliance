@@ -4,9 +4,10 @@ local toroco = require 'toroco.toroco'
 
 -- /// Handler functions ///
 
-local handler1 = function (event, v)
+local handler1 = function (event, value)
 	print (' ')
-	print (event, '=', v)
+	print (event, '=', value)
+
     toroco.send_output {motor1_setvel = {1, 33}, motor2_setvel = {0, 99}}
 end
 
