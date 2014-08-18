@@ -254,14 +254,16 @@ end
 -- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
 -- receiver_desc: receiver descriptor (return value of /toroco/behavior)
 -- timeout: number of seconds (optional)
+-- signal_data: table with data to be sent to the receiver (optional).
 
-M.suppress = function (event_desc, receiver_desc, timeout)
+M.suppress = function (event_desc, receiver_desc, timeout, signal_data)
 
     local event = get_real_event(event_desc)
 
     for _, receiver in ipairs (registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
 
+            -- set receiver as inhibited
             receiver.inhibited = receiver.inhibited or {}
 
             if timeout then
@@ -274,7 +276,20 @@ M.suppress = function (event_desc, receiver_desc, timeout)
                 receiver.inhibited [M.behavior_taskd [sched.running_task]] = { expire_time = nil }
             end
         end
-    end 
+    end
+
+    -- send signals
+
+    if signal_data then
+
+        for _, receiver in ipairs (registered_receivers[event]) do
+            if receiver.name == receiver_desc.emitter then
+
+                sched.signal (receiver.event_alias, unpack (signal_data))
+            end
+        end
+    end
+
 end
 
 -- /// Release a suppression to an event ///
