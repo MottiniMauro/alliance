@@ -300,8 +300,12 @@ end
 -- receiver_desc: receiver descriptor (return value of /toroco/behavior)
 
 M.release_suppression = function (event_desc, receiver_desc)
-    
+
     local event = get_real_event (event_desc)
+
+    if not event then
+	    log ('TOROCO', 'ERROR', 'release_suppression(): receiver is not valid. %s %s', section, task)
+    end
 
     for _, receiver in ipairs (registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
@@ -371,9 +375,7 @@ local register_handler = function(behavior_name, input_source, input_handler)
 		end
 	end)
 
-    M.behavior_taskd [taskd] = M.behaviors[behavior_name]
-
-    sched.set_pause (taskd, false)
+    return taskd
 end 
 
 
@@ -395,7 +397,8 @@ local register_output_target = function(behavior_name, output_name, target)
     end
 
     -- registers the (proxy) target function for the event.
-    register_handler (target.emitter, input_source, input_handler)
+    local taskd = register_handler (target.emitter, input_source, input_handler)
+    sched.set_pause (taskd, false)
 end
 
 -- mystic function
@@ -475,8 +478,60 @@ M.add_coroutine = function (arg1, arg2)
 
         M.behavior_taskd [taskd] = M.behaviors[behavior_name]
 
+        table.insert (M.behaviors[behavior_name].tasks, taskd)
+
         sched.set_pause (taskd, false)
     end)
+end
+
+
+-- /// Suspend a behavior ///
+-- behavior_desc: behavior descriptor (return value of /toroco/behavior)
+
+M.suspend_behavior = function (behavior_desc)
+
+    for _, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
+        sched.set_pause (taskd, true)
+    end
+end
+
+
+-- /// Resume a behavior ///
+-- behavior_desc: behavior descriptor (return value of /toroco/behavior)
+
+M.resume_behavior = function (behavior_desc)
+
+    for _, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
+        sched.set_pause (taskd, false)
+    end
+end
+
+
+-- /// Resume a behavior ///
+-- behavior_desc: behavior descriptor (return value of /toroco/behavior)
+
+M.remove_behavior = function (behavior_desc)
+
+    for _, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
+        sched.kill (taskd)
+        M.behavior_taskd [taskd] = nil
+    end
+
+    for event, event_receivers in ipairs (registered_receivers) do
+        for _, receiver in ipairs (event_receivers) do
+            if receiver.name == behavior_desc.emitter then
+
+                registered_receivers [event] = nil
+            end
+        end
+    end
+
+    for event, event_table in pairs (inhibited_events) do
+        event_table [M.behaviors [behavior_desc.emitter]] = nil
+    end
+
+    M.behaviors [behavior_desc.emitter] = nil
+
 end
 
 
@@ -548,7 +603,7 @@ M.add_behavior = function (behavior)
 
     local load_behavior = function()
         -- add behavior to 'M.behaviors'
-        M.behaviors[behavior.name] = { name = behavior.name, events = behavior.output_events, input_sources = behavior.input_sources }
+        M.behaviors[behavior.name] = { name = behavior.name, events = behavior.output_events, input_sources = behavior.input_sources, tasks = {} }
 
         -- emits new_behavior.
         M.behaviors[behavior.name].loaded = true
@@ -568,7 +623,13 @@ M.add_behavior = function (behavior)
 
         -- register the handlers
         for input_name, handler in pairs(behavior.input_handlers) do
-            register_handler (behavior.name, behavior.input_sources[input_name], behavior.input_handlers[input_name])
+            local taskd = register_handler (behavior.name, behavior.input_sources[input_name], behavior.input_handlers[input_name])
+            
+            M.behavior_taskd [taskd] = M.behaviors[behavior.name]
+
+            table.insert (M.behaviors[behavior.name].tasks, taskd)
+
+            sched.set_pause (taskd, false)
         end
 
         -- register the output targets

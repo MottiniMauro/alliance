@@ -19,7 +19,7 @@ local handler1 = function (event, value)
         print ('inhibition released')   
   
         --toroco.release_inhibition (device.mice.leftbutton)
-        toroco.release_suppression (device.mice.leftbutton, behavior.trc_level)
+        toroco.release_suppression (device.mice.leftbutton, behavior.trc_level1)
     end
 end
 
