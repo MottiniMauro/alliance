@@ -1,32 +1,30 @@
+-- /// Torocó example - Suspend and resume behaviors ///
+-- main.lua
+
+
 local toroco = require 'toroco.toroco'
 local device = toroco.device
 local behavior = toroco.behavior
 
 
-local behaviors = {
+-- initialize behaviors
 
-    trc_level1 = {
+toroco.load_behavior (behavior.level1, 'behaviors/trc_level1')
+toroco.load_behavior (behavior.level2, 'behaviors/trc_level2')
 
-        input_sources = {
-            trigger1 = device.mice.leftbutton
-        };
+-- initialize inputs
 
-        output_targets = {
-            motor1_setvel = device.trc_motor.setvel2mtr
-        };
-    };
+toroco.set_inputs (behavior.level1, {
+    trigger1 = device.mice.leftbutton
+})
 
-    trc_level2 = {
+toroco.set_inputs (behavior.level2, {
+    trigger1 = device.mice.rightbutton
+})
 
-        input_sources = {
-            trigger1 = device.mice.rightbutton
-        };
-    };
-
-};
-
-
-toroco.add_behaviors (behaviors)
+toroco.set_inputs (device.trc_motor, {
+    setvel2mtr = behavior.level1.motor1_setvel
+})
 
 -- run toroco
 
