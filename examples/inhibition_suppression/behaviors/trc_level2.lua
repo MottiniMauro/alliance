@@ -1,6 +1,8 @@
 -- /// trc_level2 ///
 
 local toroco = require 'toroco.toroco'
+local input = toroco.input
+local output = toroco.output
 local device = toroco.device
 local behavior = toroco.behavior
 
@@ -13,20 +15,27 @@ local handler1 = function (event, value)
         print ('inhibition started')        
 
         --toroco.inhibit (device.mice.leftbutton, 2.5)
-        toroco.suppress (device.mice.leftbutton, behavior.trc_level1, 2.5, {'suppressed!'})
+        toroco.suppress (device.mice.leftbutton, behavior.level1, 2.5, {'suppressed!'})
 
     else
         print ('inhibition released')   
-  
+
         --toroco.release_inhibition (device.mice.leftbutton)
-        toroco.release_suppression (device.mice.leftbutton, behavior.trc_level1)
+        toroco.release_suppression (device.mice.leftbutton, behavior.level1)
     end
 end
 
-return {
-    output_events = { }; 
-    
-    input_handlers = {
-        trigger1 = handler1;
-    } 
-}
+-- triggers
+
+local trigger1 = toroco.trigger (input.trigger1, handler1)
+
+-- add behavior
+
+toroco.add_behavior (
+    {
+        trigger1
+    },
+
+    {
+    }
+)

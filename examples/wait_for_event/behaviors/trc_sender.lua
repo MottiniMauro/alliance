@@ -2,8 +2,9 @@
 
 local toroco = require 'toroco.toroco'
 local input = toroco.input
+local output = toroco.output
 
--- /// Callback functions ///
+-- /// Functions ///
 
 -- send output callback
 
@@ -22,7 +23,7 @@ end
 local callback2 = function(event, value)
     
     if value then
-        print ('inhibition started')
+        print ('\ninhibition started')
         toroco.inhibit (toroco.device.mice.leftbutton, 2.5)
     else
         print ('inhibition released')
@@ -30,11 +31,19 @@ local callback2 = function(event, value)
     end
 end
 
-return {
-    output_events = { motor1_setvel = {} }; 
-    
-    input_handlers = {
-        gate_1 = callback1;
-        reset = callback2;
-    };
-}
+-- triggers
+
+local trigger1 = toroco.trigger (input.gate_1, callback1)
+local trigger2 = toroco.trigger (input.reset, callback2)
+
+-- add behavior
+
+toroco.add_behavior (
+    {
+        trigger1, trigger2;
+    },
+
+    {
+        output.motor1_setvel
+    }
+)

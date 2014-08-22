@@ -1,10 +1,12 @@
 -- /// trc_receiver ///
 
 local toroco = require 'toroco.toroco'
+local input = toroco.input
+local output = toroco.output
 
--- /// Callback functions ///
+-- /// functions ///
 
-local handler1 = function (event, side, value)
+local handler1 = function (event, side, value) 
 
     if value then
         if side == 'left' then
@@ -15,10 +17,18 @@ local handler1 = function (event, side, value)
     end
 end
 
-return {
-    output_events = { motor1_setvel = {} }; 
-    
-    input_handlers = {
-        trigger1 = handler1;
-    } 
-}
+-- triggers
+
+local trigger1 = toroco.trigger (input.trigger1, handler1)
+
+-- add behavior
+
+toroco.add_behavior (
+    {
+        trigger1
+    }, 
+
+    {
+        output.motor1_setvel
+    }
+)

@@ -1,8 +1,10 @@
 -- /// trc_sender ///
 
 local toroco = require 'toroco.toroco'
+local input = toroco.input
+local output = toroco.output
 
--- /// Handler functions ///
+-- /// functions ///
 
 local handler_left = function(event, v)
 	print (' ')
@@ -16,11 +18,19 @@ local handler_right = function(event, v)
     toroco.send_output {repeater_event = {'right', v}}
 end
 
-return {
-    output_events = { repeater_event = {} }; 
+-- triggers
+
+local trigger1 = toroco.trigger (input.trigger_left, handler_left)
+local trigger2 = toroco.trigger (input.trigger_right, handler_right)
+
+-- add behavior
+
+toroco.add_behavior (
+    {
+        trigger1, trigger2
+    },
     
-    input_handlers = {
-        trigger_left = handler_left;
-        trigger_right = handler_right;
-    } 
-}
+    {
+        output.repeater_event
+    }
+)

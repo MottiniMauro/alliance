@@ -12,6 +12,7 @@ local mutex = require 'lumen.mutex'
 local log = require 'lumen.log'
 
 M.input = require 'toroco.input'
+M.output = require 'toroco.output'
 M.device = require 'toroco.device'
 M.behavior = require 'toroco.behavior'
 
@@ -379,34 +380,39 @@ local register_handler = function(behavior_name, input_source, input_handler)
 end 
 
 
-local register_output_target = function(behavior_name, output_name, target)
-    local proxy = function(_, ...)
-        target(...)
+local set_device_inputs = function(device_name, input_sources)
+
+    for input_name, input_source in pairs (input_sources) do
+        local proxy = function(_, ...)
+            local device = my_wait_for_device (device_name) 
+            device[input_name](...)
+        end
+
+        -- initialize the dispatcher 
+        local event = get_real_event(input_source)
+
+        if not registered_receivers[event] then
+            registered_receivers[event] = {mutex = mutex.new()}
+
+            register_dispatcher (event)
+        end
+
+        -- registers the (proxy) target function for the event.
+        local taskd = register_handler (device_name, input_source, proxy)
+        sched.set_pause (taskd, false)
     end
-
-    local input_source = { type = 'behavior', emitter = behavior_name, name = output_name }
-    local input_handler = proxy
-
-    -- initialize the dispatcher 
-    local event = get_real_event(input_source)
-
-    if not registered_receivers[event] then
-        registered_receivers[event] = {mutex = mutex.new()}
-
-        register_dispatcher (event)
-    end
-
-    -- registers the (proxy) target function for the event.
-    local taskd = register_handler (target.emitter, input_source, input_handler)
-    sched.set_pause (taskd, false)
 end
 
--- mystic function
+-- /// Wait for an input ///
+-- This function pauses a coroutine or trigger handler 
+-- until an input is received.
+-- input_desc: input descriptor (return value of /toroco/input)
+-- timeout: number of seconds to wait or return nil (optional)
 
 M.wait_for_input = function(input_desc, timeout)
 
     -- get event
-    local input_source = M.behaviors [M.behavior_taskd [sched.running_task].name].input_sources [input_desc.name]
+    local input_source = M.behavior_taskd [sched.running_task].input_sources [input_desc.name]
     local event = get_real_event (input_source)
 
     -- initialize the waiting receiver
@@ -459,17 +465,11 @@ end
 
 M.behavior_name = nil
 
-M.add_coroutine = function (arg1, arg2) 
+-- add coroutine to a behavior
+-- behavior_desc: behavior descriptor (return value of /toroco/behavior)
+-- coroutine: function to be executed.
 
-    local coroutine
-
-    if type (arg1) == 'function' then
-        coroutine = arg1
-        behavior_name =  M.behavior_name
-    else
-        coroutine = arg2
-        behavior_name = arg1.emitter
-    end
+local add_coroutine = function (behavior_name, coroutine) 
 
     sched.run(function()
         local taskd = sched.new_task(coroutine)
@@ -484,14 +484,80 @@ M.add_coroutine = function (arg1, arg2)
     end)
 end
 
+-- /// Set the behavior inputs. ///
+-- receiver_desc: receiver descriptor (return value of /toroco/behavior)
+-- input_sources: table where the keys are the input names
+-- and the values are input descriptors (return value of /toroco/device or /toroco/behavior)
+
+M.set_inputs = function (receiver_desc, input_sources)
+
+    local set_inputs_task = function ()
+        if receiver_desc.type == 'behavior' then
+
+            M.behaviors[receiver_desc.emitter].input_sources = input_sources
+
+            -- initialize the dispatchers
+            for _, input_source in pairs (input_sources) do
+            
+                local event = get_real_event (input_source)
+
+                if not registered_receivers[event] then
+                    registered_receivers[event] = {mutex = mutex.new()}
+
+                    register_dispatcher (event)
+                end
+            end
+        elseif receiver_desc.type == 'device' then
+
+            set_device_inputs (receiver_desc.emitter, input_sources)
+        end
+    end
+
+    sched.run(set_inputs_task)
+end
+
+
+-- /// Create a trigger function ///
+-- Returns a coroutine that implements the trigger.
+-- input_desc: input descriptor (return value of /toroco/input)
+-- handler: function to be called when the input is received.
+
+M.trigger = function (input_desc, handler)
+
+    local coroutine = function()
+        local behavior =  M.behavior_taskd [sched.running_task]
+        local taskd = register_handler (behavior.name, behavior.input_sources[input_desc.name], handler)
+            
+        M.behavior_taskd [taskd] = M.behaviors[behavior.name]
+
+        table.insert (M.behaviors[behavior.name].tasks, taskd)
+
+        sched.set_pause (taskd, false)
+    end    
+
+    return coroutine 
+end
+
 
 -- /// Suspend a behavior ///
 -- behavior_desc: behavior descriptor (return value of /toroco/behavior)
 
 M.suspend_behavior = function (behavior_desc)
 
-    for _, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
-        sched.set_pause (taskd, true)
+    local remove_taskd_keys = {}
+
+    for key, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
+
+        if taskd.status ~= 'dead' then
+            sched.set_pause (taskd, true)
+        else
+            table.insert (remove_taskd_keys, key)
+            M.behavior_taskd [taskd] = nil
+        end
+    end
+
+    for _, key in ipairs (remove_taskd_keys) do
+        table.remove (M.behaviors [behavior_desc.emitter].tasks, key)
     end
 end
 
@@ -501,8 +567,20 @@ end
 
 M.resume_behavior = function (behavior_desc)
 
-    for _, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
-        sched.set_pause (taskd, false)
+    local remove_taskd_keys = {}
+
+    for key, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
+
+        if taskd.status ~= 'dead' then
+            sched.set_pause (taskd, false)
+        else
+            table.insert (remove_taskd_keys, key)
+            M.behavior_taskd [taskd] = nil
+        end
+    end
+
+    for _, key in ipairs (remove_taskd_keys) do
+        table.remove (M.behaviors [behavior_desc.emitter].tasks, key)
     end
 end
 
@@ -513,7 +591,9 @@ end
 M.remove_behavior = function (behavior_desc)
 
     for _, taskd in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
-        sched.kill (taskd)
+        if taskd.status ~= 'dead' then
+            sched.kill (taskd)
+        end
         M.behavior_taskd [taskd] = nil
     end
 
@@ -581,17 +661,11 @@ end
 -- This function loads a behavior from a file.
 -- After loading the behaviors, add_behavior must be executed.
 
-M.load_behavior = function(behavior_name)
-    local packagename = 'behaviors/'..behavior_name
+M.load_behavior = function (behavior_desc, filename)
 
-    M.behavior_name = behavior_name
+    M.behavior_name = behavior_desc.emitter
 
-    local behavior_desc = require (packagename)
-    behavior_desc.name = behavior_name
-    behavior_desc.output_targets = behavior_desc.output_targets or {}
-    behavior_desc.input_sources = behavior_desc.input_sources or {}
-
-    return behavior_desc
+    dofile (filename..'.lua')
 end
 
 
@@ -599,42 +673,36 @@ end
 -- This function adds a behavior to Torocó.
 -- behavior: table with name, output_events, output_targets, input_sources and input_handlers.
 
-M.add_behavior = function (behavior)
+M.add_behavior = function (arg1, arg2, arg3) 
+
+    local behavior_name, coroutines, outputs
+
+    if arg1.type then
+        behavior_name = arg1.emitter
+        coroutines = arg2
+        outputs = arg3
+    else
+        behavior_name = M.behavior_name
+        coroutines = arg1
+        outputs = arg2
+    end
 
     local load_behavior = function()
+        -- Create the actual events
+        local output_events = {}
+        for _, output in ipairs (outputs) do
+            output_events[output.name] = {}
+        end
+
         -- add behavior to 'M.behaviors'
-        M.behaviors[behavior.name] = { name = behavior.name, events = behavior.output_events, input_sources = behavior.input_sources, tasks = {} }
+        M.behaviors[behavior_name] = { name = behavior_name, events = output_events, input_sources = {}, tasks = {} }
 
         -- emits new_behavior.
-        M.behaviors[behavior.name].loaded = true
-        sched.signal (M.events.new_behavior, behavior.name)
-
-        -- initialize the dispatcher 
-        for _, input_source in pairs (behavior.input_sources) do
+        M.behaviors[behavior_name].loaded = true
+        sched.signal (M.events.new_behavior, behavior_name)
         
-            local event = get_real_event (input_source)
-
-            if not registered_receivers[event] then
-                registered_receivers[event] = {mutex = mutex.new()}
-
-                register_dispatcher (event)
-            end
-        end
-
-        -- register the handlers
-        for input_name, handler in pairs(behavior.input_handlers) do
-            local taskd = register_handler (behavior.name, behavior.input_sources[input_name], behavior.input_handlers[input_name])
-            
-            M.behavior_taskd [taskd] = M.behaviors[behavior.name]
-
-            table.insert (M.behaviors[behavior.name].tasks, taskd)
-
-            sched.set_pause (taskd, false)
-        end
-
-        -- register the output targets
-        for output_name, target in pairs(behavior.output_targets or {}) do
-            register_output_target (behavior.name, output_name, target)
+        for _, coroutine in ipairs (coroutines) do
+            add_coroutine (behavior_name, coroutine)
         end
     end
 
