@@ -1,8 +1,7 @@
 -- /// trc_beh1 ///
 
-local toroco = require 'toroco.toroco'
+local toroco = require 'toroco'
 local input = toroco.input
-local output = toroco.output
 
 -- /// Functions ///
 
@@ -35,18 +34,4 @@ local callback2 = function(event, value)
     end
 end
 
--- triggers
-
-local trigger2 = toroco.trigger (input.reset, callback2)
-
--- add behavior
-
-toroco.add_behavior (
-    {
-        coroutine1, trigger2
-    }, 
-
-    {
-        output.motor1_setvel
-    }
-)
+return coroutine1, toroco.trigger (input.reset, callback2)

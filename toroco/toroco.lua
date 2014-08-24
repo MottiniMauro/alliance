@@ -198,8 +198,9 @@ local get_real_event = function (event_desc)
 
         local behavior = M.wait_for_behavior (event_desc.emitter)     
        
-        if not behavior.events or not behavior.events[event_desc.name] then 
-            log ('TOROCO', 'WARN', 'Event not found for behavior %s: "%s"', tostring(behavior), tostring(event_desc.name))
+        if not behavior.events[event_desc.name] then 
+            behavior.events[event_desc.name] = {}
+            behavior.event_count = behavior.event_count + 1
         end
 
         return behavior.events[event_desc.name]
@@ -388,18 +389,28 @@ local set_device_inputs = function(device_name, input_sources)
             device[input_name](...)
         end
 
-        -- initialize the dispatcher 
-        local event = get_real_event(input_source)
+        local register_source = function (input_source)
+            -- initialize the dispatcher 
+            local event = get_real_event(input_source)
 
-        if not registered_receivers[event] then
-            registered_receivers[event] = {mutex = mutex.new()}
+            if not registered_receivers[event] then
+                registered_receivers[event] = {mutex = mutex.new()}
 
-            register_dispatcher (event)
+                register_dispatcher (event)
+            end
+
+            -- registers the (proxy) target function for the event.
+            local taskd = register_handler (device_name, input_source, proxy)
+            sched.set_pause (taskd, false)
         end
 
-        -- registers the (proxy) target function for the event.
-        local taskd = register_handler (device_name, input_source, proxy)
-        sched.set_pause (taskd, false)
+        if input_source.type then
+            register_source (input_source)
+        else
+            for _, source in ipairs(input_source) do
+                register_source (source)
+            end
+        end
     end
 end
 
@@ -455,15 +466,23 @@ M.send_output = function(output_values)
     	-- send a signal for the event, with the extra parameters
         if output_values[event_name] then
             sched.signal (event, unpack(output_values[event_name]))
-            
-    	-- send a signal for the event, with no extra parameters
+
+    	-- Warning: the event is not defined at the send_output invocation
         else
             sched.signal (event)
+            print ('Warning: Missing event ' .. event_name .. ' at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
         end
     end
-end
 
-M.behavior_name = nil
+    -- check for unused events in output_values
+    local count = 0
+    for _ in pairs(output_values) do 
+        count = count + 1
+    end
+    if count > M.behavior_taskd [sched.running_task].event_count then
+        print ('Warning: Unused events at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
+    end
+end
 
 -- add coroutine to a behavior
 -- behavior_desc: behavior descriptor (return value of /toroco/behavior)
@@ -661,52 +680,32 @@ end
 -- This function loads a behavior from a file.
 -- After loading the behaviors, add_behavior must be executed.
 
-M.load_behavior = function (behavior_desc, filename)
+M.load_behavior = function (behavior_desc, pathname)
 
-    M.behavior_name = behavior_desc.emitter
-
-    dofile (filename..'.lua')
+    M.add_behavior (behavior_desc, {dofile (pathname..'.lua')})
 end
 
 
 -- /// Add behavior to Torocó. ///
 -- This function adds a behavior to Torocó.
--- behavior: table with name, output_events, output_targets, input_sources and input_handlers.
 
-M.add_behavior = function (arg1, arg2, arg3) 
-
-    local behavior_name, coroutines, outputs
-
-    if arg1.type then
-        behavior_name = arg1.emitter
-        coroutines = arg2
-        outputs = arg3
-    else
-        behavior_name = M.behavior_name
-        coroutines = arg1
-        outputs = arg2
-    end
+M.add_behavior = function (behavior_desc, coroutines) 
 
     local load_behavior = function()
-        -- Create the actual events
-        local output_events = {}
-        for _, output in ipairs (outputs) do
-            output_events[output.name] = {}
-        end
 
         -- add behavior to 'M.behaviors'
-        M.behaviors[behavior_name] = { name = behavior_name, events = output_events, input_sources = {}, tasks = {} }
+        M.behaviors [behavior_desc.emitter] = { name = behavior_desc.emitter, events = { }, event_count = 0, input_sources = {}, tasks = {} }
 
         -- emits new_behavior.
-        M.behaviors[behavior_name].loaded = true
-        sched.signal (M.events.new_behavior, behavior_name)
+        M.behaviors [behavior_desc.emitter].loaded = true
+        sched.signal (M.events.new_behavior, behavior_desc.emitter)
         
         for _, coroutine in ipairs (coroutines) do
-            add_coroutine (behavior_name, coroutine)
+            add_coroutine (behavior_desc.emitter, coroutine)
         end
     end
 
-    sched.run(load_behavior)
+    sched.run (load_behavior)
 end
 
 
@@ -723,41 +722,6 @@ M.run = function(toribio_conf_file)
     print ('Torocó go!')
 
     sched.loop()
-end
-
-
--- /// Add behaviors to Torocó. ///
--- This function loads the behaviors from the files,
--- and then adds the behaviors to Torocó.
--- behaviors: table with behavior data.
-
-M.add_behaviors = function (behaviors)
-
-	-- for each behavior in the table, ...
-    for behavior_name, behavior_table in pairs(behaviors) do
-    
-    	-- load behavior table
-        local behavior = M.load_behavior (behavior_name)
-
-        -- TODO: Error handling
-        
-		-- add input_sources to the behavior table.
-        behavior.input_sources = behavior.input_sources or {}
-
-        for input_name, event_source in pairs (behavior_table.input_sources) do
-            behavior.input_sources [input_name] = event_source
-        end
-
-		-- add output_targets to the behavior table.
-        behavior.output_targets = behavior.output_targets or {}
-
-        for output_name, target in pairs(behavior_table.output_targets or {}) do
-            behavior.output_targets[output_name] = target
-        end
-
-		-- add behavior to Torocó.
-        M.add_behavior(behavior)
-    end
 end
 
 -------------------------------------------------------------------------------

@@ -31,11 +31,6 @@ toroco.add_behavior (
 
             toroco.send_output {motor1_setvel = {1, 33}, motor2_setvel = {0, 99}}
         end)
-    },
-
-    {
-        output.motor1_setvel,
-        output.motor2_setvel
     }
 )
 
@@ -59,9 +54,6 @@ toroco.add_behavior (
                 toroco.release_suppression (device.mice.leftbutton, behavior.level1)
             end
         end)
-    },
-
-    {
     }
 )
 
@@ -78,7 +70,7 @@ toroco.set_inputs (behavior.level2, {
 })
 
 toroco.set_inputs (device.trc_motor, {
-    setvel2mtr = behavior.level1.motor1_setvel
+    setvel2mtr = { behavior.level1.motor1_setvel, behavior.level1.motor2_setvel }
 })
 
 -- run toroco

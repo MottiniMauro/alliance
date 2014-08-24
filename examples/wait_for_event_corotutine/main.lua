@@ -1,10 +1,9 @@
 -- /// Torocó example - wait_for_event with coroutines ///
 -- main.lua
 
-
 -- imports
 
-local toroco = require 'toroco.toroco'
+local toroco = require 'toroco.init'
 local device = toroco.device
 local behavior = toroco.behavior
 

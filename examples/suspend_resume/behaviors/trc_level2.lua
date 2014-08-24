@@ -2,7 +2,6 @@
 
 local toroco = require 'toroco.toroco'
 local input = toroco.input
-local output = toroco.output
 local device = toroco.device
 local behavior = toroco.behavior
 
@@ -53,9 +52,6 @@ local handler_swap = function (event, value)
                         toroco.release_suppression (device.mice.leftbutton, behavior.level1)
                     end
                 end)
-            },
-
-            {
             }
         )
 
@@ -67,18 +63,6 @@ local handler_swap = function (event, value)
     end
 end
 
--- triggers
+return toroco.trigger (input.trigger1, handler_suspend)
+--return toroco.trigger (input.trigger1, handler_swap)
 
-local trigger1 = toroco.trigger (input.trigger1, handler_suspend)
---local trigger1 = toroco.trigger (input.trigger1, handler_swap)
-
--- add behavior
-
-toroco.add_behavior (
-    {
-        trigger1
-    },
-
-    {
-    }
-)

@@ -2,7 +2,6 @@
 
 local toroco = require 'toroco.toroco'
 local input = toroco.input
-local output = toroco.output
 
 -- /// functions ///
 
@@ -17,18 +16,5 @@ local handler1 = function (event, side, value)
     end
 end
 
--- triggers
+return toroco.trigger (input.trigger1, handler1)
 
-local trigger1 = toroco.trigger (input.trigger1, handler1)
-
--- add behavior
-
-toroco.add_behavior (
-    {
-        trigger1
-    }, 
-
-    {
-        output.motor1_setvel
-    }
-)
