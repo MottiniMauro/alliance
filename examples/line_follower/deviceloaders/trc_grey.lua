@@ -33,6 +33,8 @@ M.init = function(conf)
         -- capture the mouse button signals
 	    local mice = toribio.wait_for_device ({module='mice'})
 	
+        -- register the callback for the mouse event
+        -- to get the grey value.
 	    toribio.register_callback (mice, event..'button', function(v)
 		    value = v
 	    end)

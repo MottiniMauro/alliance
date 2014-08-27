@@ -68,7 +68,7 @@ local dispatch_signal = function (event, ...)
 
             -- update inhibition
             for inhibitor, inhibition in pairs(receiver.inhibited) do
-                if inhibition.expire_time < sched.get_time() then
+                if inhibition.expire_time and inhibition.expire_time < sched.get_time() then
                     receiver.inhibited [inhibitor] = nil
                 end
             end
@@ -156,13 +156,14 @@ local get_real_event = function (event_desc)
             	
             	-- return the event of the device polling function
                 if polling_devices[event_desc.emitter] and polling_devices[event_desc.emitter][event_desc.name] then
-                    return polling_devices[event_desc.emitter].event
+
+                    return polling_devices[event_desc.emitter][event_desc.name].event
                 
                 -- create a new device polling function, and return the new event
                 else
                 	-- polling event
                     local event = {}
-                    
+
                     -- polling function
                     local value = nil
                     local polling_function = function()
