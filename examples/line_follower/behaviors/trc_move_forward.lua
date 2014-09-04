@@ -6,7 +6,7 @@ local input = toroco.input
 
 -- /// Functions ///
 
-local coroutine = function (event, value)
+local coroutine = function ()
 
     while true do
 

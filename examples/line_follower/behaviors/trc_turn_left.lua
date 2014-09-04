@@ -12,12 +12,12 @@ local handler1 = function (event, value)
     -- black detected
     if value then
         print ('\nstart turning left')
-        toroco.suppress (behavior.move_forward.motors_setvel, device.trc_motor, nil, {1, 30, 1, 100})
+        toroco.send_output {motors_setvel = {1, 30, 1, 100}}
 
     -- white detected
     else
         print ('\nstop turning left')
-        toroco.release_suppression (behavior.move_forward.motors_setvel, device.trc_motor)
+        toroco.send_output {motors_setvel = {release = true}}
     end
 end
 

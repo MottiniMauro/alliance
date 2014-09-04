@@ -24,7 +24,11 @@ toroco.set_inputs (behavior.turn_right, {
 })
 
 toroco.set_inputs (device.trc_motor, {
-    setvel2mtr = behavior.move_forward.motors_setvel
+    setvel2mtr = {
+        behavior.move_forward.motors_setvel,
+        behavior.turn_left.motors_setvel,
+        behavior.turn_right.motors_setvel
+    }
 })
 
 -- run toroco

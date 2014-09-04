@@ -44,14 +44,11 @@ toroco.add_behavior (
             if value then
                 print ('inhibition started')        
 
-                --toroco.inhibit (device.mice.leftbutton, 2.5)
-                toroco.suppress (device.mice.leftbutton, behavior.level1, 2.5, {'suppressed!'})
-
+                toroco.send_output {clickbutton = {'suppressed!'; timeout = 2.5}}
             else
                 print ('inhibition released')   
 
-                --toroco.release_inhibition (device.mice.leftbutton)
-                toroco.release_suppression (device.mice.leftbutton, behavior.level1)
+                toroco.send_output {clickbutton = {'released!'; timeout = 0.0}}       -- should be reset_output()
             end
         end)
     }
@@ -61,9 +58,26 @@ toroco.add_behavior (
 
 -- initialize inputs
 
+
+---[[
 toroco.set_inputs (behavior.level1, {
-    trigger1 = device.mice.leftbutton
+    trigger1 = {
+        device.mice.leftbutton,
+        behavior.level2.clickbutton
+    }
 })
+--]]
+
+--[[
+toroco.set_inputs (behavior.level1, {
+    trigger1 = {
+        device.mice.leftbutton
+    }
+})
+toroco.set_inhibitors (device.mice, {
+    leftbutton = behavior.level2.clickbutton
+})
+--]]
 
 toroco.set_inputs (behavior.level2, {
     trigger1 = device.mice.rightbutton
@@ -72,6 +86,7 @@ toroco.set_inputs (behavior.level2, {
 toroco.set_inputs (device.trc_motor, {
     setvel2mtr = { behavior.level1.motor1_setvel, behavior.level1.motor2_setvel }
 })
+
 
 -- run toroco
 

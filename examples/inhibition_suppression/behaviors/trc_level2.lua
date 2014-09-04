@@ -13,14 +13,11 @@ local handler1 = function (event, value)
     if value then
         print ('inhibition started')        
 
-        --toroco.inhibit (device.mice.leftbutton, 2.5)
-        toroco.suppress (device.mice.leftbutton, behavior.level1, 2.5, {'suppressed!'})
-
+        toroco.send_output {clickbutton = {'suppressed!'; timeout = 2.5}}
     else
         print ('inhibition released')   
 
-        --toroco.release_inhibition (device.mice.leftbutton)
-        toroco.release_suppression (device.mice.leftbutton, behavior.level1)
+        toroco.send_output {clickbutton = {'released!'; release = true}}       -- should be reset_output()
     end
 end
 

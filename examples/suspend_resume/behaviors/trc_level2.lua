@@ -42,18 +42,25 @@ local handler_swap = function (event, value)
             {
                 toroco.trigger (input.trigger1, function (event, value)
                     if value then
-                        print ('\ninhibition started')        
-                        --toroco.inhibit (device.mice.leftbutton, 2.5)
-                        toroco.suppress (device.mice.leftbutton, behavior.level1, 2.5, {'suppressed!'})
+                        print ('\ninhibition started')
+
+                        toroco.send_output {clickbutton = {}}
 
                     else
-                        print ('\ninhibition released')   
-                        --toroco.release_inhibition (device.mice.leftbutton)
-                        toroco.release_suppression (device.mice.leftbutton, behavior.level1)
+                        print ('\ninhibition released')
+
+                        toroco.send_output {clickbutton = {release = true}}
                     end
                 end)
             }
         )
+
+        toroco.set_inputs (behavior.level1, {
+            trigger1 = {
+                device.mice.leftbutton,
+                behavior.level3.clickbutton
+            }
+        })
 
         toroco.set_inputs (behavior.level3, {
             trigger1 = device.mice.rightbutton
@@ -63,6 +70,6 @@ local handler_swap = function (event, value)
     end
 end
 
-return toroco.trigger (input.trigger1, handler_suspend)
---return toroco.trigger (input.trigger1, handler_swap)
+--return toroco.trigger (input.trigger1, handler_suspend)
+return toroco.trigger (input.trigger1, handler_swap)
 

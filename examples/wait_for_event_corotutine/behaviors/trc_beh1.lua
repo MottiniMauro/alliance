@@ -21,17 +21,5 @@ local coroutine1 = function()
     end
 end
 
--- inhibition callback
+return coroutine1
 
-local callback2 = function(event, value)
-    
-    if value then
-        print ('\ninhibition started')
-        toroco.inhibit (toroco.device.mice.leftbutton, 2.5)
-    else
-        print ('inhibition released')
-        toroco.release_inhibition (toroco.device.mice.leftbutton)
-    end
-end
-
-return coroutine1, toroco.trigger (input.reset, callback2)
