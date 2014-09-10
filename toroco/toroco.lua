@@ -22,23 +22,70 @@ require 'lumen.tasks.selector'.init({service='nixio'})
 -- *** Variables ***
 -- *****************
 
--- Behaviors managed by Torocó
+
+-- /// behaviors ///
+-- Behaviors managed by Torocó.
+-- Key: Behavior name.
+-- Value fields:
+--	name: Behavior name.
+--	events: Events emitted by the behavior. Key: Event name.
+--	event_count: number of
+--	input_sources: Sources of each input of the behavior.
+--	tasks: taskd of each coroutine of the behavior. No key.
+--	inhibition_targets: Target events to be inhibited for each output event of the behavior.
+--	suppression_targets: Target events to be suppressed by each output event of the behavior.
 
 M.behaviors = {}
 
+-- /// behavior_taskd ///
+-- Behavior of each coroutine.
+-- Key: Taskd of the coroutine.
+-- Value: Behavior.
+
 M.behavior_taskd = {}
 
+-- /// events ///
+-- events
+
+M.active_events = {}
+
 local events = {
-	new_behavior = {}
+	new_behavior = {},
+    release = {} -- One for each event in torocó
 }
 M.events = events
 
+-- /// polling_devices ///
+-- Events of device polling functions.
+-- Keys: Device name, Event name.
+-- Value fields:
+--	event: Event emitted by the polling function.
+
 local polling_devices = {}
 
--- List of registered receivers for each event
+-- /// registered_receivers ///
+-- Registered receivers for each event.
+-- Key: Event
+-- Value fields:
+--	name: Nehavior name.
+--	event_alias: Event to be sent by the dispatcher to the receiver.
+--	suppressed: Expire time of the suppressors of each input event of the receiver.
+--	execute_count: Number of times that the event should be sent to the receiver.
 
 local registered_receivers = {}
+
+-- /// inhibited_events ///
+-- Inhibited events of each behavior.
+-- Expire time of the inhibitors of each output event of the emitter.
+-- Keys: Event, Behavior.
+-- Value fields:
+--	expire_time: sched.get_time() + timeout.
+
 local inhibited_events = {}
+
+
+M.devices = {}
+
 
 -- *****************
 -- *** Functions ***
@@ -47,16 +94,18 @@ local inhibited_events = {}
 -- This function is executed when Torocó captures a signal.
 -- It resend the signal to all receivers which registered to the event,
 -- applying the inhibition and suppression restrictions.
+-- filter_receiver: table with receivers that will receive the event (a subset of registered_receivers).
+-- if nil, the event is sent to all receivers.
 
-local dispatch_signal = function (event, ...)
-
-    registered_receivers [event].mutex:acquire()
+local dispatch_signal = function (event, filter_receiver, ...)
 
     -- update inhibition
     for inhibitor, inhibition in pairs (inhibited_events [event]) do
 
         if inhibition.expire_time and inhibition.expire_time < sched.get_time() then
             inhibited_events [event] [inhibitor] = nil
+
+            sched.schedule_signal (M.events.release [event])
         end
     end
 
@@ -67,25 +116,32 @@ local dispatch_signal = function (event, ...)
 
         -- for each registered receiver of the event, ...
         for key, receiver in ipairs (registered_receivers [event]) do
-            -- update suppression
-            for suppressor, suppression_desc in pairs(receiver.suppressed [event] or {}) do
-                if suppression_desc.expire_time and suppression_desc.expire_time < sched.get_time() then
-                    receiver.suppressed [event] [suppressor] = nil
-                end
-            end
 
-            -- check suppression
-            if next(receiver.suppressed [event] or {}) == nil then
+            -- if the receiver is included in the filter, ...
+            if not filter_receiver or filter_receiver == receiver.name then
 
-                if receiver.execute_count and receiver.execute_count == 0 then
-                    table.insert(remove_keys, key)
-                else
-                    if receiver.execute_count then
-                        receiver.execute_count = receiver.execute_count - 1
+                -- update suppression
+                for suppressor, suppression_desc in pairs(receiver.suppressed [event] or {}) do
+                    if suppression_desc.expire_time and suppression_desc.expire_time < sched.get_time() then
+                        receiver.suppressed [event] [suppressor] = nil
+                        
+                        sched.schedule_signal (M.events.release [event], receiver.name)
                     end
+                end
 
-                    -- send alias signal
-                    sched.signal (receiver.event_alias, ...)  
+                -- check suppression
+                if next(receiver.suppressed [event] or {}) == nil then
+
+                    if receiver.execute_count and receiver.execute_count == 0 then
+                        table.insert(remove_keys, key)
+                    else
+                        if receiver.execute_count then
+                            receiver.execute_count = receiver.execute_count - 1
+                        end
+
+                        -- send alias signal
+                        sched.schedule_signal (receiver.event_alias, ...)  
+                    end
                 end
             end
         end 
@@ -94,8 +150,6 @@ local dispatch_signal = function (event, ...)
             table.remove(registered_receivers [event], key)
         end
     end
-
-    registered_receivers [event].mutex:release()
 end
 
 -- Torocó version of sched.wait_for_device().
@@ -180,7 +234,7 @@ local get_real_event = function (event_desc)
 
                         if (new_value ~= value) then
                             value = new_value
-                            sched.signal (event, new_value)
+                            sched.schedule_signal (event, new_value)
                         end
                     end
 
@@ -261,6 +315,8 @@ local release_inhibition = function (event_desc)
     end
 
     inhibited_events [event] [M.behavior_taskd [sched.running_task]] = nil
+
+    sched.schedule_signal (M.events.release [event])
 end
 
 -- Suppresses an event received by a specific behavior.
@@ -281,7 +337,7 @@ local suppress = function (event_desc, receiver_desc, timeout, signal_data)
     for _, receiver in ipairs (registered_receivers[event]) do
         if receiver.name == receiver_desc.emitter then
 
-            -- set receiver as inhibited
+            -- set receiver as suppressed
             receiver.suppressed [event] = receiver.suppressed [event] or {}
             
             if timeout then
@@ -316,6 +372,8 @@ local release_suppression = function (event_desc, receiver_desc)
             end
         end
     end 
+
+    sched.schedule_signal (M.events.release [event], receiver_desc.emitter)
 end
 
 
@@ -342,7 +400,11 @@ local register_dispatcher = function(event)
         event
     }
 
-    sched.sigrun(waitd, dispatch_signal)
+    local no_filter_receiver = function (event, ...)
+        dispatch_signal (event, nil, ...)
+    end
+
+    sched.sigrun (waitd, no_filter_receiver)
 end
 
 -- Stores the task for the event of the inputs in 'registered_receivers',
@@ -364,9 +426,7 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
         -- add the receiver to registered_receivers
         local event = get_real_event (input_source)
 
-        registered_receivers [event].mutex:acquire()
         table.insert (registered_receivers[event], receiver)
-        registered_receivers [event].mutex:release()
     end
 
     -- initialize the callback function
@@ -380,7 +440,7 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
 		receiver.event_alias
 	}
 
- 	local taskd = sched.new_task( function()
+ 	local taskd = sched.run( function()
 		while true do
 			fsynched(sched.wait(waitd))
 		end
@@ -416,9 +476,7 @@ M.wait_for_input = function(input_desc, timeout)
         -- add the receiver to registered_receivers
         local event = get_real_event (input_source)
 
-        registered_receivers [event].mutex:acquire()
         table.insert (registered_receivers [event], receiver)
-        registered_receivers [event].mutex:release()
     end
 
     -- initialize the waiting function
@@ -439,7 +497,7 @@ end
 -- it sends a signal for each output event of the behavior.
 -- output_value: table with the extra parameters for each signal.
 
-M.send_output = function(output_values)
+M.send_output = function (output_values)
 
     local beh = M.behavior_taskd [sched.running_task]
 
@@ -481,12 +539,12 @@ M.send_output = function(output_values)
                 end
 
         	    -- send a signal for the event, with the extra parameters
-                sched.signal (event, unpack(output_values[event_name]))
+                sched.schedule_signal (event, unpack(output_values[event_name]))
             end
 
     	-- Warning: the event is not defined at the send_output invocation
         else
-            sched.signal (event)
+            sched.schedule_signal (event)
             print ('Warning: Missing event ' .. event_name .. ' at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
         end
     end
@@ -501,23 +559,93 @@ M.send_output = function(output_values)
     end
 end
 
+M.set_output = function (output_values)
+
+    local beh = M.behavior_taskd [sched.running_task]
+
+    assert(beh, 'Must run in a behavior')
+
+	-- for each event of the behavior, ...
+    for event_name, event in pairs(beh.events) do
+
+        -- if the event is defined at output_values, ...
+        if output_values [event_name] then
+            
+            -- set the event as active with the new values.
+            M.active_events [event] = output_values [event_name]
+
+            -- start the inhibitions for the event
+            for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
+
+                inhibit (inhibition_target)
+            end
+
+            -- start the suppressions for the event
+            for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
+
+                suppress (suppression_target.event, suppression_target.receiver)
+            end
+
+    	    -- send a signal for the event, with the extra parameters
+            sched.schedule_signal (event, unpack(output_values[event_name]))
+
+    	-- Warning: the event is not defined at the send_output invocation
+        else
+            sched.schedule_signal (event)
+            print ('Warning: Missing event ' .. event_name .. ' at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
+        end
+    end
+
+    -- check for unused events in output_values
+    local count = 0
+    for _ in pairs(output_values) do 
+        count = count + 1
+    end
+    if count > M.behavior_taskd [sched.running_task].event_count then
+        print ('Warning: Unused events at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
+    end
+end
+
+M.unset_output = function ()
+
+    local beh = M.behavior_taskd [sched.running_task]
+
+    for event_name, event in pairs(beh.events) do
+        
+        if M.active_events [event] then
+            -- set the event as inactive
+            M.active_events [event] = nil
+                
+            -- release the inhibitions for the event
+            for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
+
+                release_inhibition (inhibition_target)
+            end
+
+            -- release the suppressions for the event
+            for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
+
+                release_suppression (suppression_target.event, suppression_target.receiver)
+            end
+        end
+    end
+end
+
 -- add coroutine to a behavior
 -- behavior_desc: behavior descriptor (return value of /toroco/behavior)
 -- coroutine: function to be executed.
 
 local add_coroutine = function (behavior_name, coroutine) 
 
-    sched.run(function()
-        local taskd = sched.new_task(coroutine)
+    local taskd = sched.new_task(coroutine)
 
-        M.wait_for_behavior(behavior_name)
+    M.wait_for_behavior(behavior_name)
 
-        M.behavior_taskd [taskd] = M.behaviors[behavior_name]
+    M.behavior_taskd [taskd] = M.behaviors[behavior_name]
 
-        table.insert (M.behaviors[behavior_name].tasks, taskd)
+    table.insert (M.behaviors[behavior_name].tasks, taskd)
 
-        sched.set_pause (taskd, false)
-    end)
+    sched.set_pause(taskd, true)
 end
 
 -- /// ///
@@ -545,6 +673,17 @@ local set_device_inputs = function(device_name, inputs)
     end
 end
 
+
+local emmit_active_events = function (event_sources, receiver) 
+    for _, event_desc in ipairs (event_sources) do
+        local event = get_real_event (event_desc)
+        if M.active_events[event] then
+            dispatch_signal (event, receiver, unpack (M.active_events [event]))
+            sched.wait()
+        end
+    end
+end
+
 -- /// Set the behavior inputs. ///
 -- receiver_desc: receiver descriptor (return value of /toroco/behavior)
 -- input_sources: table where the keys are the input names
@@ -553,6 +692,20 @@ end
 M.set_inputs = function (receiver_desc, inputs)
 
     local set_inputs_task = function ()
+
+        --[[
+        local old_input_sources = {}
+        if receiver_desc.type == 'behavior' then
+            local beh = M.wait_for_behavior (receiver_desc.emitter)
+            old_input_sources = beh.input_sources
+
+        elseif receiver_desc.type == 'device' then
+            local device = my_wait_for_device (receiver_desc.emitter)
+            if M.devices [device] then
+                old_input_sources = M.devices [device].input_sources
+            end
+        end
+        --]]
 
         -- Remove old suppresion targets in other behaviors.
         for _, beh in pairs (M.behaviors) do
@@ -578,19 +731,42 @@ M.set_inputs = function (receiver_desc, inputs)
             end
 
             local suppression_targets = {}
-            for _, input_source in pairs (input_sources) do
+            for _, input_source in ipairs (input_sources) do
 
+                -- register a function to capture the release suppression event.
                 local event = get_real_event (input_source)
+
+                if not M.events.release [event] then
+                    M.events.release [event] = {}
+
+                    local mx = mutex.new()
+                    local fsynched = mx:synchronize (function (_, receiver)
+
+                        if M.active_events [event] then
+                            dispatch_signal (event, receiver, unpack (M.active_events [event]))
+                        end
+                    end)
+
+                    local waitd = {
+		                M.events.release [event]
+	                }
+
+                 	local taskd = sched.new_task( function()
+		                while true do
+			                fsynched(sched.wait(waitd))
+		                end
+	                end)
+                end
 
                 -- initialize the dispatchers
                 if not registered_receivers[event] then
-                    registered_receivers[event] = {mutex = mutex.new()}
+                    registered_receivers[event] = {}
 
                     register_dispatcher (event)
                 end
                 
                 if input_source.type == 'behavior' then
-                    -- add the suppression targets
+                    -- add the suppression targets to beh
                     local beh = M.wait_for_behavior(input_source.emitter)
                     beh.suppression_targets [input_source.name] =
                         beh.suppression_targets [input_source.name] or {}
@@ -608,11 +784,21 @@ M.set_inputs = function (receiver_desc, inputs)
         end
 
         if receiver_desc.type == 'behavior' then
-            local beh = M.wait_for_behavior(receiver_desc.emitter)
+
+            local beh = M.wait_for_behavior (receiver_desc.emitter)
+
             beh.input_sources = inputs
 
         elseif receiver_desc.type == 'device' then
+
+            local device = my_wait_for_device (receiver_desc.emitter)
+            M.devices [device] = { input_sources = inputs }
+
             set_device_inputs (receiver_desc.emitter, inputs)
+        end
+
+        for _, input_events in pairs (inputs) do
+            emmit_active_events (input_events, receiver_desc.emitter)
         end
     end
 
@@ -639,7 +825,7 @@ M.set_inhibitors = function (emitter_desc, outputs_inhibitors)
 
                 if inhibitor_event_desc.type == 'behavior' then
 
-                    local beh = M.behaviors [inhibitor_event_desc.emitter]
+                    local beh = M.wait_for_behavior (inhibitor_event_desc.emitter)
                     beh.inhibition_targets [inhibitor_event_desc.name] =
                         beh.inhibition_targets [inhibitor_event_desc.name] or {}
 
@@ -665,13 +851,12 @@ M.trigger = function (input_desc, handler)
 
     local coroutine = function()
         local behavior =  M.behavior_taskd [sched.running_task]
+
         local taskd = register_handler (behavior.name, input_desc.name, behavior.input_sources[input_desc.name], handler)
             
         M.behavior_taskd [taskd] = M.behaviors[behavior.name]
 
         table.insert (M.behaviors[behavior.name].tasks, taskd)
-
-        sched.set_pause (taskd, false)
     end    
 
     return coroutine 
@@ -755,6 +940,7 @@ end
 
 
 -- suspend a task until the behavior has been registered to Torocó.
+local waitd = {M.events.new_behavior}
 
 M.wait_for_behavior = function(behavior_name, timeout)
     assert(sched.running_task, 'Must run in a task')
@@ -772,7 +958,6 @@ M.wait_for_behavior = function(behavior_name, timeout)
         wait_until = sched.get_time() + timeout 
     end
     
-    local waitd = {M.events.new_behavior}
     if wait_until then 
         waitd.timeout = wait_until-sched.get_time() 
     end
@@ -781,7 +966,6 @@ M.wait_for_behavior = function(behavior_name, timeout)
 
         -- wait for the event 'new_behavior'
 	    local ev, new_behavior_name = sched.wait(waitd) 
-
         -- process the result.
 	    if not ev then --timeout
 		    return nil, 'timeout'
@@ -812,7 +996,6 @@ end
 M.add_behavior = function (behavior_desc, coroutines) 
 
     local load_behavior = function()
-
         -- add behavior to 'M.behaviors'
         M.behaviors [behavior_desc.emitter] = {
             name = behavior_desc.emitter,
@@ -831,9 +1014,27 @@ M.add_behavior = function (behavior_desc, coroutines)
         for _, coroutine in ipairs (coroutines) do
             add_coroutine (behavior_desc.emitter, coroutine)
         end
+    
+        local init_behavior = function()
+            local run_tasks = {}
+            for _, task in ipairs (M.behaviors [behavior_desc.emitter].tasks) do
+                sched.set_pause (task, false)
+                table.insert (run_tasks, task)
+            end
+
+            for _, task in ipairs (run_tasks) do
+                sched.run (task)
+            end
+
+            for _, input_events in pairs (M.behaviors [behavior_desc.emitter].input_sources) do
+                emmit_active_events (input_events, behavior_desc.emitter)
+            end
+        end
+
+        sched.new_task(init_behavior)
     end
 
-    sched.run (load_behavior)
+    sched.new_task(load_behavior)
 end
 
 

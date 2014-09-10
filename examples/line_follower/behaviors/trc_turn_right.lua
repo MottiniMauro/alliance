@@ -12,12 +12,12 @@ local handler1 = function (event, value)
     -- black detected
     if value then
         print ('\nstart turning right')
-        toroco.send_output {motors_setvel = {1, 100, 1, 30}}
+        toroco.set_output {motors_setvel = {1, 100, 1, 30}}
 
     -- white detected
     else
         print ('\nstop turning right')
-        toroco.send_output {motors_setvel = {release = true}}
+        toroco.unset_output {}
     end
 end
 
