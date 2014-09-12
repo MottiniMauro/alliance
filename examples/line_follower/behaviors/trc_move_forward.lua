@@ -8,16 +8,8 @@ local input = toroco.input
 
 local coroutine = function ()
 
-    --while true do
-        --sched.sleep (0.1)
-        -- move forward
-	    print ('move forward')
-        --toroco.send_output {motors_setvel = {1, 100, 1, 100}}
-        toroco.set_output {motors_setvel = {1, 100, 1, 100}}
-
-        -- wait a little
-        --sched.sleep (2.5)
-    --end
+    print ('move forward')
+    toroco.set_output {motors_setvel = {1, 100, 1, 100}}
 end
 
 return coroutine
