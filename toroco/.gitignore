@@ -1,0 +1,11 @@
+#Scite backup
+*~
+
+#vim swap
+*.swp
+
+*.BAK
+*.bak
+
+nixio.so
+nixio

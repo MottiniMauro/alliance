@@ -67,7 +67,7 @@ local polling_devices = {}
 -- Registered receivers for each event.
 -- Key: Event
 -- Value fields:
---	name: Nehavior name.
+--	name: Behavior name.
 --	event_alias: Event to be sent by the dispatcher to the receiver.
 --	suppressed: Expire time of the suppressors of each input event of the receiver.
 --	execute_count: Number of times that the event should be sent to the receiver.
@@ -140,11 +140,10 @@ local dispatch_signal = function (event, filter_receiver, ...)
                             receiver.execute_count = receiver.execute_count - 1
                         end
                         -- send alias signal
-                        receiver.is_executing = true
-                        sched.schedule_signal (receiver.event_alias, ...)  
+                        sched.schedule_signal (receiver.event_alias, ...)
                     end
                 end
-            end
+           	end
         end 
 
         for _, key in ipairs (remove_keys) do
@@ -439,7 +438,9 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
     -- initialize the callback function
     local mx = mutex.new()
     local fsynched = mx:synchronize (function(_, ...)
+            receiver.is_executing = true
             input_handler(input_name, ...)
+            receiver.is_executing = nil
         end
     )
 
@@ -450,7 +451,6 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
  	local taskd = sched.run( function()
 		while true do
 			fsynched(sched.wait(waitd))
-            receiver.is_executing = nil
 		end
 	end)
 
@@ -527,12 +527,14 @@ M.send_output = function (output_values)
             
             -- if it's a release event, ...
             if output_values[event_name].release then
+            
+                -- release the inhibitions for the event
                 for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
 
                     release_inhibition (M.behavior_taskd [sched.running_task], inhibition_target)
                 end
 
-                -- start the suppressions for the event
+                -- release the suppressions for the event
                 for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
 
                     release_suppression (M.behavior_taskd [sched.running_task], suppression_target.event, suppression_target.receiver)
@@ -575,6 +577,13 @@ M.send_output = function (output_values)
     end
 end
 
+-- /// Set the behavior output ///
+-- This function sets the output of a behavior, that is,
+-- it sets a signal for each output event of the behavior.
+-- If any of the output events is inhibited/suppressed and then released,
+-- it resends the signal to the targets.
+-- output_value: table with the extra parameters for each signal.
+
 M.set_output = function (output_values)
 
     local beh = M.behavior_taskd [sched.running_task]
@@ -611,6 +620,10 @@ M.set_output = function (output_values)
 
     sched.wait()
 end
+
+-- /// Set the behavior output ///
+-- This function unsets the output of a behavior, that is,
+-- it unsets the signals for each output event of the behavior.
 
 M.unset_output = function ()
 
@@ -982,7 +995,7 @@ M.remove_behavior = function (behavior_desc)
     end
 
     M.behaviors [behavior_desc.emitter] = nil
-
+    
 end
 
 

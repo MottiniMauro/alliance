@@ -44,7 +44,7 @@ local handler_swap = function (event, value)
                     if value then
                         print ('\ninhibition started')
 
-                        toroco.send_output {clickbutton = { true }}
+                        toroco.send_output {clickbutton = { false }}
 
                     else
                         print ('\ninhibition released')
