@@ -1,4 +1,4 @@
--- /// Torocó example - Suspend and resume behaviors ///
+-- /// Torocó - Remove ///
 -- /// trc_level1 ///
 
 local toroco = require 'toroco.toroco'

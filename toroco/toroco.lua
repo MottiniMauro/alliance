@@ -91,6 +91,33 @@ M.devices = {}
 -- *** Functions ***
 -- *****************
 
+-- Checks if the inhibition has expired.
+-- If it has expired, the inhibition is dropped.
+
+local check_inhibition_expiration = function (event, inhibitor, inhibition)
+
+    if inhibition.expire_time and inhibition.expire_time < sched.get_time() then
+
+        inhibited_events [event] [inhibitor] = nil
+
+        sched.schedule_signal (M.events.release [event])
+    end
+end
+
+-- Checks if the suppression has expired.
+-- If it has expired, the suppression is dropped.
+
+local check_suppression_expiration = function (event, suppressor, suppression_desc, receiver)
+
+    if suppression_desc.expire_time and suppression_desc.expire_time < sched.get_time() then
+
+        receiver.suppressed [event] [suppressor] = nil
+        
+        sched.schedule_signal (M.events.release [event], receiver.name)
+    end
+end
+
+
 -- This function is executed when Torocó captures a signal.
 -- It resend the signal to all receivers which registered to the event,
 -- applying the inhibition and suppression restrictions.
@@ -102,11 +129,7 @@ local dispatch_signal = function (event, filter_receiver, ...)
     -- update inhibition
     for inhibitor, inhibition in pairs (inhibited_events [event]) do
 
-        if inhibition.expire_time and inhibition.expire_time < sched.get_time() then
-            inhibited_events [event] [inhibitor] = nil
-
-            sched.schedule_signal (M.events.release [event])
-        end
+        check_inhibition_expiration (event, inhibitor, inhibition)
     end
 
     -- check inhibition
@@ -119,15 +142,12 @@ local dispatch_signal = function (event, filter_receiver, ...)
             local receiver = registered_receivers [event] [i]
 
             -- if the receiver is included in the filter, ...
-            if not receiver.is_executing and (not filter_receiver or filter_receiver == receiver.name) then
+            if not filter_receiver or filter_receiver == receiver.name then
 
                 -- update suppression
                 for suppressor, suppression_desc in pairs(receiver.suppressed [event] or {}) do
-                    if suppression_desc.expire_time and suppression_desc.expire_time < sched.get_time() then
-                        receiver.suppressed [event] [suppressor] = nil
-                        
-                        sched.schedule_signal (M.events.release [event], receiver.name)
-                    end
+
+                    check_suppression_expiration (event, suppressor, suppression_desc, receiver)
                 end
 
                 -- check suppression
@@ -135,7 +155,8 @@ local dispatch_signal = function (event, filter_receiver, ...)
 
                     if receiver.execute_count and receiver.execute_count == 0 then
                         table.remove(registered_receivers [event], i)
-                    else
+
+                    elseif not receiver.is_executing then
                         if receiver.execute_count then
                             receiver.execute_count = receiver.execute_count - 1
                         end
@@ -295,6 +316,18 @@ local inhibit = function (behavior, event_desc, timeout)
 
     if timeout then
         inhibited_events [event] [behavior] = { expire_time = sched.get_time() + timeout }
+
+        -- check later for expiration
+        sched.run (function ()
+            local waitd = {
+		        timeout = timeout,
+	        }
+            sched.wait (waitd)
+            if inhibited_events [event] [behavior] then
+                check_inhibition_expiration (event, behavior, inhibited_events [event] [behavior])
+            end
+        end)
+
     else
         inhibited_events [event] [behavior] = { expire_time = nil }
     end
@@ -341,6 +374,18 @@ local suppress = function (behavior, event_desc, receiver_desc, timeout)
             
             if timeout then
                 receiver.suppressed [event] [behavior] = { expire_time = sched.get_time() + timeout }
+
+                -- check later for expiration
+                sched.run (function ()
+                    local waitd = {
+		                timeout = timeout,
+	                }
+                    sched.wait (waitd)
+                    if receiver.suppressed [event] [behavior] then
+                        check_suppression_expiration (event, behavior, receiver.suppressed [event] [behavior], receiver)
+                    end
+                end)
+
             else
                 receiver.suppressed [event] [behavior] = { expire_time = nil }
             end
@@ -501,7 +546,6 @@ M.wait_for_input = function(input_desc, timeout)
 
     local f = function(_, ...)
         table.remove (M.behavior_taskd [sched.running_task].receivers, key)
-        receiver.is_executing = nil
         return ...
     end
 
@@ -575,6 +619,8 @@ M.send_output = function (output_values)
     if count > M.behavior_taskd [sched.running_task].event_count then
         print ('Warning: Unused events at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
     end
+
+    sched.wait()
 end
 
 -- /// Set the behavior output ///
@@ -943,8 +989,8 @@ M.suspend_behavior = function (behavior_desc)
         if tasks [i].status ~= 'dead' then
             sched.set_pause (tasks [i], true)
         else
-            table.remove (tasks, i)
             M.behavior_taskd [tasks [i]] = nil
+            table.remove (tasks, i)
         end
     end
 end
@@ -962,8 +1008,8 @@ M.resume_behavior = function (behavior_desc)
         if tasks [i].status ~= 'dead' then
             sched.set_pause (tasks [i], false)
         else
-            table.remove (tasks, i)
             M.behavior_taskd [tasks [i]] = nil
+            table.remove (tasks, i)
         end
     end
 end

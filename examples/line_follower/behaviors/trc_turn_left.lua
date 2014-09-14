@@ -2,8 +2,6 @@
 
 local toroco = require 'toroco.toroco'
 local input = toroco.input
-local behavior = toroco.behavior
-local device = toroco.device
 
 -- /// Functions ///
 
