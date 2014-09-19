@@ -84,7 +84,31 @@ local registered_receivers = {}
 local inhibited_events = {}
 
 
+-- /// M.devices ///
+
 M.devices = {}
+
+
+-- /// M.params ///
+-- Paramaters of each behavior.
+-- Key: Parameter name.
+-- Example: toroco.params.max_value.
+
+M.params = {}
+
+local meta1
+meta1 = {
+	__index = function (table, key)
+        local beh = M.behavior_taskd [sched.running_task]
+		return beh.params[key]
+	end,
+
+	__newindex = function (table, key, value)
+        local beh = M.behavior_taskd [sched.running_task]
+		beh.params[key] = value
+	end,
+}
+setmetatable(M.params, meta1)
 
 
 -- *****************
@@ -1090,16 +1114,16 @@ end
 -- This function loads a behavior from a file.
 -- After loading the behaviors, add_behavior must be executed.
 
-M.load_behavior = function (behavior_desc, pathname)
+M.load_behavior = function (behavior_desc, pathname, params)
 
-    M.add_behavior (behavior_desc, {dofile (pathname..'.lua')})
+    M.add_behavior (behavior_desc, {dofile (pathname..'.lua')}, params)
 end
 
 
 -- /// Add behavior to Torocó. ///
 -- This function adds a behavior to Torocó.
 
-M.add_behavior = function (behavior_desc, coroutines) 
+M.add_behavior = function (behavior_desc, coroutines, params) 
 
     local load_behavior = function()
         -- add behavior to 'M.behaviors'
@@ -1112,7 +1136,8 @@ M.add_behavior = function (behavior_desc, coroutines)
             input_sources = {},
             release_tasks = {},
             receivers = {},
-            tasks = {}
+            tasks = {},
+            params = params or {}
         }
 
         -- emits new_behavior.
