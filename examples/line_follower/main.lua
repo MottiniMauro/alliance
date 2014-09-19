@@ -16,7 +16,7 @@ toroco.load_behavior (behavior.turn_right, 'behaviors/trc_turn_right')
 -- initialize inputs
 ---[[
 toroco.set_inputs (behavior.turn_left, {
-    trigger_left = device.trc_grey_left.get_value
+    trigger_left = device.trc_grey_left.get_value 
 })
 
 toroco.set_inputs (behavior.turn_right, {
@@ -31,6 +31,7 @@ toroco.set_inputs (device.trc_motor, {
     }
 })
 --]]
+
 -- run toroco
 
 toroco.run ()
