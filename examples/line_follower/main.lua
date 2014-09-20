@@ -13,10 +13,19 @@ toroco.load_behavior (behavior.move_forward, 'behaviors/trc_move_forward')
 toroco.load_behavior (behavior.turn_left, 'behaviors/trc_turn_left')
 toroco.load_behavior (behavior.turn_right, 'behaviors/trc_turn_right')
 
+
+local converter = function (event_value)
+    if event_value then
+        return false
+    else
+        return true
+    end 
+end
+
 -- initialize inputs
 ---[[
 toroco.set_inputs (behavior.turn_left, {
-    trigger_left = device.trc_grey_left.get_value 
+    trigger_left = device.trc_grey_left.get_value.convert (converter)
 })
 
 toroco.set_inputs (behavior.turn_right, {

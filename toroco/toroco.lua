@@ -201,7 +201,11 @@ end
 
 local my_wait_for_device = function(devdesc, timeout)
 	assert(sched.running_task, 'Must run in a task')
-	
+
+    if type (devdesc) == 'table' then
+        return toribio.wait_for_device (devdesc)
+    end
+
 	local wait_until
 	if timeout then wait_until=sched.get_time() + timeout end
 	
@@ -240,6 +244,44 @@ local my_wait_for_device = function(devdesc, timeout)
 	
 end
 
+local do_device_polling = function (event_desc, time, convert)
+    -- return the event of the device polling function
+    if polling_devices[event_desc.emitter] and polling_devices[event_desc.emitter][event_desc.name] then
+
+        return polling_devices[event_desc.emitter][event_desc.name].event
+    
+    -- create a new device polling function, and return the new event
+    else
+    	-- polling event
+        local event = {}
+
+        -- polling function
+        local value = nil
+        local polling_function = function()
+            local device = my_wait_for_device (event_desc.emitter)
+            local new_value = device[event_desc.name]();
+            if convert then
+                new_value = convert (new_value)
+            end
+            if (new_value ~= value) then
+                value = new_value
+                sched.schedule_signal (event, new_value)
+            end
+        end
+
+		-- store the polling event in polling_devices.
+        if not polling_devices[event_desc.emitter] then
+            polling_devices[event_desc.emitter] = {}
+        end
+        polling_devices[event_desc.emitter][event_desc.name] = { event = event }
+
+		-- start the polling function.
+        sched.sigrun ({ {}, timeout = time }, polling_function)
+
+        return event
+    end
+end
+
 -- returns the real event from a device or behavior.
 -- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
 
@@ -249,12 +291,7 @@ local get_real_event = function (event_desc)
 
     if event_desc.type == 'device' then
         
-        local wait_for_device = my_wait_for_device
-        if type (event_desc.emitter) == 'table' then
-            wait_for_device = toribio.wait_for_device
-        end
-
-        local device = wait_for_device (event_desc.emitter)
+        local device = my_wait_for_device (event_desc.emitter)
         
         -- if the device does not have the event, ...
         if not device.events or not device.events[event_desc.name] then
@@ -262,38 +299,7 @@ local get_real_event = function (event_desc)
         	-- if the device has a function with that event, ...
             if device[event_desc.name] then
             	
-            	-- return the event of the device polling function
-                if polling_devices[event_desc.emitter] and polling_devices[event_desc.emitter][event_desc.name] then
-
-                    return polling_devices[event_desc.emitter][event_desc.name].event
-                
-                -- create a new device polling function, and return the new event
-                else
-                	-- polling event
-                    local event = {}
-
-                    -- polling function
-                    local value = nil
-                    local polling_function = function()
-                        local new_value = device[event_desc.name]();
-
-                        if (new_value ~= value) then
-                            value = new_value
-                            sched.schedule_signal (event, new_value)
-                        end
-                    end
-
-					-- store the polling event in polling_devices.
-                    if not polling_devices[event_desc.emitter] then
-                        polling_devices[event_desc.emitter] = {}
-                    end
-                    polling_devices[event_desc.emitter][event_desc.name] = { event = event }
-
-					-- start the polling function.
-                    sched.sigrun ({ {}, timeout = 0.1 }, polling_function)
-
-                    return event
-                end
+            	return do_device_polling (event_desc, 0.1)
             else
                 log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(event_desc.name))
             end
@@ -527,6 +533,15 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
 
     return receiver
 end 
+
+--- /// Configures a device polling function ///
+-- event_desc: event descriptor (return value of /toroco/device)
+-- time: Refresh time in seconds
+-- converter: function for converting the raw value
+
+M.configure_polling = function (event_desc, time, converter)
+    do_device_polling (event_desc, time, converter)
+end
 
 -- /// Wait for an input ///
 -- This function pauses a coroutine or trigger handler 
