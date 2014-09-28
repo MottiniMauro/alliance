@@ -118,7 +118,7 @@ setmetatable(M.params, meta1)
 -- Checks if the inhibition has expired.
 -- If it has expired, the inhibition is dropped.
 
-local check_inhibition_expiration = function (event, inhibitor, inhibition)
+local update_inhibition_expiration = function (event, inhibitor, inhibition)
 
     if inhibition.expire_time and inhibition.expire_time < sched.get_time() then
 
@@ -131,7 +131,7 @@ end
 -- Checks if the suppression has expired.
 -- If it has expired, the suppression is dropped.
 
-local check_suppression_expiration = function (event, suppressor, suppression_desc, receiver)
+local update_suppression_expiration = function (event, suppressor, suppression_desc, receiver)
 
     if suppression_desc.expire_time and suppression_desc.expire_time < sched.get_time() then
 
@@ -153,13 +153,11 @@ local dispatch_signal = function (event, filter_receiver, ...)
     -- update inhibition
     for inhibitor, inhibition in pairs (inhibited_events [event]) do
 
-        check_inhibition_expiration (event, inhibitor, inhibition)
+        update_inhibition_expiration (event, inhibitor, inhibition)
     end
 
     -- check inhibition
     if next(inhibited_events [event]) == nil then
-
-        local remove_keys = {}
 
         -- for each registered receiver of the event, ...
         for i = #registered_receivers [event], 1, -1 do
@@ -171,7 +169,7 @@ local dispatch_signal = function (event, filter_receiver, ...)
                 -- update suppression
                 for suppressor, suppression_desc in pairs(receiver.suppressed [event] or {}) do
 
-                    check_suppression_expiration (event, suppressor, suppression_desc, receiver)
+                    update_suppression_expiration (event, suppressor, suppression_desc, receiver)
                 end
 
                 -- check suppression
@@ -190,10 +188,6 @@ local dispatch_signal = function (event, filter_receiver, ...)
                 end
            	end
         end 
-
-        for _, key in ipairs (remove_keys) do
-            table.remove(registered_receivers [event], key)
-        end
     end
 end
 
@@ -354,7 +348,7 @@ local inhibit = function (behavior, event_desc, timeout)
 	        }
             sched.wait (waitd)
             if inhibited_events [event] [behavior] then
-                check_inhibition_expiration (event, behavior, inhibited_events [event] [behavior])
+                update_inhibition_expiration (event, behavior, inhibited_events [event] [behavior])
             end
         end)
 
@@ -412,7 +406,7 @@ local suppress = function (behavior, event_desc, receiver_desc, timeout)
 	                }
                     sched.wait (waitd)
                     if receiver.suppressed [event] [behavior] then
-                        check_suppression_expiration (event, behavior, receiver.suppressed [event] [behavior], receiver)
+                        update_suppression_expiration (event, behavior, receiver.suppressed [event] [behavior], receiver)
                     end
                 end)
 
@@ -897,7 +891,9 @@ M.set_inputs = function (receiver_desc, inputs)
 
                 local mx = mutex.new()
                 local fsynched = mx:synchronize (function (_, receiver)
-                    if M.active_events [event] then
+                    receiver = receiver or receiver_desc.emitter
+                    -- emit the event if it's active and should be received by this receiver
+                    if receiver_desc.emitter == receiver and M.active_events [event] then
                         dispatch_signal (event, receiver, unpack (M.active_events [event]))
                     end
                 end)
