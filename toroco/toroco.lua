@@ -1,4 +1,17 @@
+------------
+-- Main file of Torocó.
+-- @module toroco,lua
+-- @author Ignacio Bettosini and Agustín Clavelli
+
+-- ***************
+-- *** Package ***
+-- ***************
+
 package.path = package.path .. ";;;lumen/?.lua;toribio/?/init.lua;toribio/?.lua"
+
+-- **************
+-- *** Module ***
+-- **************
 
 local M = {}
 
@@ -317,12 +330,12 @@ local get_real_event = function (event_desc)
 end
 
 
--- /// Inhibit an event ///
+---- Inhibit an event. ///
 -- This function inhibits an event sent by a behavior.
--- The inhibition is associated with the running behavior,
--- and is independent of other inhibitions to the same event that were set by other behaviors.
--- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
--- timeout: number of seconds (optional)
+-- The inhibition is independent of other inhibitions to the same event that were set by other behaviors.
+-- @param behavior    Inhibiting behavior.
+-- @param event_desc   Event descriptor (return value of /toroco/device or /toroco/behavior)
+-- @param[opt] timeout Number of seconds.
 
 local inhibit = function (behavior, event_desc, timeout)
 
@@ -357,11 +370,11 @@ local inhibit = function (behavior, event_desc, timeout)
     end
 end
 
--- /// Release an inhibition to an event ///
+---- Release an inhibition to an event. ///
 -- This function releases an inhibition to an event.
--- The released inhibition is the one associated with the running behavior,
--- and is independent of other inhibitions to the same event that were set by other behaviors.
--- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
+-- The released inhibition is independent of other inhibitions to the same event that were set by other behaviors.
+-- @param behavior   Releasing behavior.
+-- @param event_desc event descriptor (return value of /toroco/device or /toroco/behavior)
 
 local release_inhibition = function (behavior, event_desc)
 
@@ -376,12 +389,13 @@ local release_inhibition = function (behavior, event_desc)
     sched.schedule_signal (M.events.release [event])
 end
 
--- Suppresses an event received by a specific behavior.
+---- Suppresses an event received by a specific behavior. ///
 -- The suppression is associated with the running behavior,
 -- and is independent of other suppressions to the same event that were set by other behaviors.
--- event_desc: event descriptor
--- receiver_desc: receiver descriptor (return value of /toroco/behavior)
--- timeout: number of seconds (optional)
+-- @param behavior      Suppressing behavior.
+-- @param event_desc    Event descriptor
+-- @param receiver_desc Receiver descriptor (return value of /toroco/behavior)
+-- @param[opt] timeout  Number of seconds.
 
 local suppress = function (behavior, event_desc, receiver_desc, timeout)
 
@@ -417,12 +431,13 @@ local suppress = function (behavior, event_desc, receiver_desc, timeout)
     end
 end
 
--- /// Release a suppression to an event ///
+---- Release a suppression to an event ///
 -- This function releases a suppression to an event for a specific behavior.
 -- The released suppression is the one associated with the running behavior,
 -- and is independent of other inhibitions to the same event that were set by other behaviors.
--- event_desc: event descriptor (return value of /toroco/device or /toroco/behavior)
--- receiver_desc: receiver descriptor (return value of /toroco/behavior)
+-- @param behavior      Releasing behavior.
+-- @param event_desc    Event descriptor (return value of /toroco/device or /toroco/behavior)
+-- @param receiver_desc Receiver descriptor (return value of /toroco/behavior)
 
 local release_suppression = function (behavior, event_desc, receiver_desc)
 
@@ -528,20 +543,21 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
     return receiver
 end 
 
---- /// Configures a device polling function ///
--- event_desc: event descriptor (return value of /toroco/device)
--- time: Refresh time in seconds
--- converter: function for converting the raw value
+---- Configures a device polling function. ///
+-- @param event_desc Event descriptor (return value of /toroco/device)
+-- @param time  	 Refresh time in seconds
+-- @param converter  Function for converting the raw value
 
 M.configure_polling = function (event_desc, time, converter)
     do_device_polling (event_desc, time, converter)
 end
 
--- /// Wait for an input ///
+---- Wait for an input. ///
 -- This function pauses a coroutine or trigger handler 
 -- until an input is received.
--- input_desc: input descriptor (return value of /toroco/input)
--- timeout: number of seconds to wait or return nil (optional)
+-- @param input_desc      Input descriptor (return value of /toroco/input)
+-- @param[opt] timeout    Number of seconds to wait or return nil.
+-- @return                List of extra parameters of the received event. If there is none, it returns nil.
 
 M.wait_for_input = function(input_desc, timeout)
 
@@ -585,10 +601,10 @@ M.wait_for_input = function(input_desc, timeout)
     return f(sched.wait(waitd)) 
 end
 
--- /// Send the behavior output ///
+---- Send the behavior output. ///
 -- This function sends the output of a behavior, that is,
 -- it sends a signal for each output event of the behavior.
--- output_value: table with the extra parameters for each signal.
+-- @param output_values Table with the extra parameters for each event.
 
 M.send_output = function (output_values)
 
@@ -656,12 +672,12 @@ M.send_output = function (output_values)
     sched.wait()
 end
 
--- /// Set the behavior output ///
+---- Set the behavior output. ///
 -- This function sets the output of a behavior, that is,
 -- it sets a signal for each output event of the behavior.
 -- If any of the output events is inhibited/suppressed and then released,
 -- it resends the signal to the targets.
--- output_value: table with the extra parameters for each signal.
+-- @param output_values Table with the extra parameters for each signal.
 
 M.set_output = function (output_values)
 
@@ -700,7 +716,7 @@ M.set_output = function (output_values)
     sched.wait()
 end
 
--- /// Set the behavior output ///
+---- Set the behavior output. ///
 -- This function unsets the output of a behavior, that is,
 -- it unsets the signals for each output event of the behavior.
 
@@ -780,9 +796,9 @@ local emit_active_events = function (event_sources, receiver)
     end
 end
 
--- /// Set the behavior inputs. ///
--- receiver_desc: receiver descriptor (return value of /toroco/behavior)
--- input_sources: table where the keys are the input names
+---- Set the behavior inputs. ///
+-- @param receiver_desc  Receiver descriptor (return value of /toroco/behavior)
+-- @param inputs         Table where the keys are the input names
 -- and the values are input descriptors (return value of /toroco/device or /toroco/behavior)
 
 M.set_inputs = function (receiver_desc, inputs)
@@ -948,9 +964,9 @@ M.set_inputs = function (receiver_desc, inputs)
     sched.run(set_inputs_task)
 end
 
--- /// Sets the inhibitors for an emitter. ///
--- emitter_desc: emitter descriptor (return value of /toroco/behavior or /toroco/device).
--- outputs_inhibitors: table of inhibitors for each output event.
+---- Sets the inhibitors for an emitter. ///
+-- @param emitter_desc        Emitter descriptor (return value of /toroco/behavior or /toroco/device).
+-- @param outputs_inhibitors  Table of inhibitors for each output event.
 
 M.set_inhibitors = function (emitter_desc, outputs_inhibitors)
 
@@ -985,10 +1001,10 @@ M.set_inhibitors = function (emitter_desc, outputs_inhibitors)
 end
 
 
--- /// Create a trigger function ///
+----  Create a trigger function. ///
 -- Returns a coroutine that implements the trigger.
--- input_desc: input descriptor (return value of /toroco/input)
--- handler: function to be called when the input is received.
+-- @param input_desc  Input descriptor (return value of /toroco/input)
+-- @param handler     function to be called when the input is received.
 
 M.trigger = function (input_desc, handler)
 
@@ -1012,8 +1028,8 @@ M.trigger = function (input_desc, handler)
 end
 
 
--- /// Suspend a behavior ///
--- behavior_desc: behavior descriptor (return value of /toroco/behavior)
+---- Suspend a behavior. ///
+-- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior)
 
 M.suspend_behavior = function (behavior_desc)
 
@@ -1031,8 +1047,8 @@ M.suspend_behavior = function (behavior_desc)
 end
 
 
--- /// Resume a behavior ///
--- behavior_desc: behavior descriptor (return value of /toroco/behavior)
+---- Resume a behavior. ///
+-- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior)
 
 M.resume_behavior = function (behavior_desc)
 
@@ -1050,8 +1066,8 @@ M.resume_behavior = function (behavior_desc)
 end
 
 
--- /// Resume a behavior ///
--- behavior_desc: behavior descriptor (return value of /toroco/behavior)
+---- Resume a behavior. ///
+-- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior)
 
 M.remove_behavior = function (behavior_desc)
 
@@ -1121,9 +1137,12 @@ M.wait_for_behavior = function(behavior_name, timeout)
     
 end
 
--- /// Registers a behavior to Torocó. ///
+---- Registers a behavior to Torocó. ///
 -- This function loads a behavior from a file.
 -- After loading the behaviors, add_behavior must be executed.
+-- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior).
+-- @param pathname       Behavior filepath.
+-- @param params         Values of the behavior parameters.
 
 M.load_behavior = function (behavior_desc, pathname, params)
 
@@ -1131,8 +1150,11 @@ M.load_behavior = function (behavior_desc, pathname, params)
 end
 
 
--- /// Add behavior to Torocó. ///
+---- Adds a behavior to Torocó. ///
 -- This function adds a behavior to Torocó.
+-- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior).
+-- @param coroutines     Table with the coroutines of the behavior.
+-- @param params         Values of the behavior parameters.
 
 M.add_behavior = function (behavior_desc, coroutines, params) 
 
@@ -1182,8 +1204,8 @@ M.add_behavior = function (behavior_desc, coroutines, params)
 end
 
 
--- Torocó main function
--- toribio_conf_file: configuration filename (optional).
+---- Torocó main function. ///
+-- @param[opt] toribio_conf_file Configuration filename.
 
 M.run = function(toribio_conf_file)
     if toribio_conf then
@@ -1199,8 +1221,8 @@ end
 
 -------------------------------------------------------------------------------
 
--- load Torocó configuration file.
--- file: configuration filename.
+---- Load Torocó configuration file. ///
+-- @param file Configuration filename.
 
 M.load_configuration = function(file)
 	local func_conf, err = loadfile(file)
