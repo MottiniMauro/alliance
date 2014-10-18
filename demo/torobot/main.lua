@@ -12,6 +12,7 @@ local behavior = toroco.behavior
 toroco.load_behavior (behavior.move_forward, 'behaviors/trc_move_forward')
 toroco.load_behavior (behavior.turn_left, 'behaviors/trc_turn', {motors_values = {30, 100}})
 toroco.load_behavior (behavior.turn_right, 'behaviors/trc_turn', {motors_values = {100, 30}})
+toroco.load_behavior (behavior.red_follower, 'behaviors/red_follower')
 
 -- initialize inputs
 ---[[
@@ -29,6 +30,10 @@ toroco.set_inputs (device.servo_motors, {
         behavior.turn_left.motors_setvel,
         behavior.turn_right.motors_setvel
     }
+})
+
+toroco.set_inputs (behavior.red_follower, {
+    update = device.camera.update
 })
 --]]
 

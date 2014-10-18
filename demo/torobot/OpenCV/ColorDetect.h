@@ -20,9 +20,7 @@ public:
 	~ColorDetect();
 	void getVideo();
 	cv::Mat getThresh(const cv::Mat &inImg);
-	cv::Mat detect(const cv::Mat &img);
-	void update();
-
+	cv::Point2f detect();
 };
 
 #endif

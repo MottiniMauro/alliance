@@ -12,6 +12,9 @@ ColorDetect::~ColorDetect() { }
 void ColorDetect::getVideo()
 {
 	vcap.open(0); //0 = connected webcam
+
+    vcap.set(CV_CAP_PROP_FRAME_WIDTH, 160);
+    vcap.set(CV_CAP_PROP_FRAME_HEIGHT, 120);
 	
 	if (!vcap.isOpened())
 		std::cout << "Could not open video input stream" << std::endl;
@@ -125,8 +128,12 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 	}
 }
 
-cv::Mat ColorDetect::detect(const cv::Mat &img)
+cv::Point2f ColorDetect::detect()
 {	
+    cv::Mat img;
+
+    vcap >> img;
+
 	cv::Mat in, cvtImg, thrImg, eImg, dImg, bettoImg;
 	cv::Mat element1(4, 4, CV_8U, cv::Scalar(1));
 	cv::Mat element2(6, 6, CV_8U, cv::Scalar(1));
@@ -164,6 +171,8 @@ cv::Mat ColorDetect::detect(const cv::Mat &img)
 	cv::Rect superRect;
 	int superArea = 0;
 
+    cv::Point2f center;
+
 	for (unsigned int i = 0; i < contours.size(); i++)
 	{
 		if (contourArea(contours[i]) > 500) {
@@ -173,9 +182,12 @@ cv::Mat ColorDetect::detect(const cv::Mat &img)
 			if (contourArea(contours[i]) > superArea) {
 				superArea = contourArea(contours[i]);
 				superRect = boundRect[i];
+                center = cv::Point2f(superRect.tl().x + superRect.size().width / 2, superRect.tl().y + superRect.size().height / 2);
 			}
 		}
 	}
+
+    cv::line( bettoImg, center, center + cv::Point2f( 2, 0), cv::Scalar( 0, 0, 255), 15 );
 
 	/*
 	for (unsigned int j = 0; j < contours.size(); j++)
@@ -187,19 +199,8 @@ cv::Mat ColorDetect::detect(const cv::Mat &img)
 	if (superArea > 0) {
 		cv::rectangle(bettoImg, superRect, cv::Scalar(0, 255, 0), 2);
 	}
+		
+    cv::imshow("Color Detect", bettoImg);
 
-	return bettoImg;
-}
-
-void ColorDetect::update()
-{	
-	cv::Mat src;
-	cv::namedWindow("Color Detect");
-
-	for (;;)
-	{
-		vcap >> src;
-		cv::imshow("Color Detect", detect(src));
-		if (cv::waitKey(45) >= 0) break;
-	}
+	return center;
 }
