@@ -41,14 +41,27 @@ M.init = function (conf)
 
 	--listen for messages
 	sched.sigrun ({udp.events.data}, function (_, msg) 
-		local left, right
+
+		local color_x, color_y
+
 		if msg then
-			left, right = msg:match ('^([^,]+),([^,]+)$')
+
+            -- get color position
+			color_x, color_y = msg:match ('^([^,]+),([^,]+)$')
+
+            color_x = tonumber (color_x)
+            color_y = tonumber (color_y)
+
+            -- if out of range, return nil
+
+            if color_x and color_x < -100 then
+			    color_x, color_y = nil, nil
+            end
 		else
-			left, right = 0, 0
+			color_x, color_y = nil, nil
 		end
 		
-        sched.signal (update, left, right)
+        sched.signal (update, color_x, color_y)
 		
         return true
 	end)

@@ -9,7 +9,7 @@ using namespace toroco;
 int main()
 {
 	ColorDetect cd;
-    cv::Point2f center;
+    cv::Point2i color_center;
 
 	cv::namedWindow("Color Detect");
 
@@ -21,12 +21,18 @@ int main()
     {
         while (true)
         {
-
-		    center = cd.detect();
+            // get blob center
+		    color_center = cd.detect();
 
             std::stringstream ss;
-            ss << center.x << "," << center.y << std::endl;
 
+            if (color_center.x >= -100 and color_center.x <= 100) {
+                ss << color_center.x << "," << color_center.y << std::endl;
+            }
+            else {
+                ss << "none" << std::endl;
+            }
+    
             socket.Send(ss.str());
 
 		    if (cv::waitKey(45) >= 0) 

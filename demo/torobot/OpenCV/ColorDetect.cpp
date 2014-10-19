@@ -1,5 +1,8 @@
 #include "ColorDetect.h"
 
+#define VIDEO_WINDOW_WIDTH 160
+#define VIDEO_WINDOW_HEIGHT 120
+
 ColorDetect::ColorDetect()
 {
 
@@ -13,8 +16,9 @@ void ColorDetect::getVideo()
 {
 	vcap.open(0); //0 = connected webcam
 
-    vcap.set(CV_CAP_PROP_FRAME_WIDTH, 160);
-    vcap.set(CV_CAP_PROP_FRAME_HEIGHT, 120);
+    // set video image size
+    vcap.set(CV_CAP_PROP_FRAME_WIDTH, VIDEO_WINDOW_WIDTH);
+    vcap.set(CV_CAP_PROP_FRAME_HEIGHT, VIDEO_WINDOW_HEIGHT);
 	
 	if (!vcap.isOpened())
 		std::cout << "Could not open video input stream" << std::endl;
@@ -30,7 +34,7 @@ cv::Mat ColorDetect::getThresh(const cv::Mat &inImg)
 	cv::Mat tmpImg = inImg;
 	cv::Mat imgThresh(tmpImg.size(), tmpImg.type());
 	
-	cv::inRange(tmpImg, cv::Scalar(0, 60, 60), cv::Scalar(20, 200, 255), imgThresh);
+	cv::inRange(tmpImg, cv::Scalar(0, 50, 50), cv::Scalar(20, 200, 255), imgThresh);
 	
 	return imgThresh;
 }
@@ -98,26 +102,26 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 				cvtImg.at<cv::Vec3b>(indx,indy)[0] = cvtImg.at<cv::Vec3b>(indx,indy)[0] / 2;
 				
 				// remove black
-				if (lightness < 60) {
+				if (lightness < 50) {
 					saturation = 0;
 				}
 			
 				// remove grey
-				if (saturation < 90) {
-					saturation = 0;
+				if (saturation < 40) {
+		//			saturation = 0;
 				}
 			
 				// remove white
-				if (lightness > 150) {
+				if (lightness > 200) {
 					saturation = 0;
 				}
 			
 				// remove skin
-				if ((saturation < 110) && (lightness > 130)) {
-					saturation = 0;
+				if ((saturation < 80) && (lightness > 130)) {
+		//			saturation = 0;
 				}
 				
-				if ((saturation < 130) && (lightness > 100)) {
+				if ((saturation < 100) && (lightness > 100)) {
 		//			saturation = 0;
 				}
 			}
@@ -128,7 +132,10 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 	}
 }
 
-cv::Point2f ColorDetect::detect()
+// returns the blob center.
+// range is normalized to -100 to +100 (negative is left, positive is right, 0 is center).
+
+cv::Point2i ColorDetect::detect()
 {	
     cv::Mat img;
 
@@ -182,25 +189,45 @@ cv::Point2f ColorDetect::detect()
 			if (contourArea(contours[i]) > superArea) {
 				superArea = contourArea(contours[i]);
 				superRect = boundRect[i];
-                center = cv::Point2f(superRect.tl().x + superRect.size().width / 2, superRect.tl().y + superRect.size().height / 2);
 			}
 		}
 	}
 
-    cv::line( bettoImg, center, center + cv::Point2f( 2, 0), cv::Scalar( 0, 0, 255), 15 );
+    // if the blob was detected, ...
+    if (superArea > 0) {
 
-	/*
-	for (unsigned int j = 0; j < contours.size(); j++)
-	{
-		cv::rectangle(bettoImg, boundRect[j], cv::Scalar(0, 255, 0), 2);
-	}
-	*/
+        // get blob center
+        center = cv::Point2f(superRect.tl().x + superRect.size().width / 2, superRect.tl().y + superRect.size().height / 2);
+
+        // draw center in video window
+        cv::line( bettoImg, center, center + cv::Point2f( 2, 0), cv::Scalar( 0, 0, 255), 15 );
+
+	    /*
+	    for (unsigned int j = 0; j < contours.size(); j++)
+	    {
+		    cv::rectangle(bettoImg, boundRect[j], cv::Scalar(0, 255, 0), 2);
+	    }
+	    */
+
+        // draw blob in video window
 	
-	if (superArea > 0) {
-		cv::rectangle(bettoImg, superRect, cv::Scalar(0, 255, 0), 2);
-	}
+	    if (superArea > 0) {
+		    cv::rectangle(bettoImg, superRect, cv::Scalar(0, 255, 0), 2);
+	    }
+    }
 		
     cv::imshow("Color Detect", bettoImg);
 
-	return center;
+    // normalize blob center to -100 to +100.
+    
+    if (superArea > 0) {
+
+        cv::Point2i center_n = cv::Point2i ((center.x * 200 / VIDEO_WINDOW_WIDTH) - 100, (center.y * 200 / VIDEO_WINDOW_HEIGHT) - 100);
+
+	    return center_n;
+    }
+    else {
+        return cv::Point2i (-999, -999);
+    }
+
 }
