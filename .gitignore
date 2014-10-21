@@ -7,5 +7,7 @@
 *.BAK
 *.bak
 
+*.o
+
 nixio.so
 nixio
