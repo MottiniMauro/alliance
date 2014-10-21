@@ -14,7 +14,7 @@ int main()
     
     socket.Create();
     
-    if (socket.Connect("192.168.7.2", 2113))
+    if (socket.Connect("192.168.7.2", 2120))
     {
         std::cout << "Sending!" << std::endl;
 

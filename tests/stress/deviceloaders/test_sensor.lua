@@ -23,7 +23,7 @@ M.init = function (conf)
 
     conf = conf or  {}
 	local ip = conf.ip or '*'
-	local port = conf.port or 2113
+	local port = conf.port or 2120
 		
 
     local udp = selector.new_udp (nil, nil, ip, port, 'line')

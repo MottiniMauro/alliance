@@ -14,7 +14,7 @@ int main()
     
     socket.Create();
     
-    if (socket.Bind(2113))
+    if (socket.Bind(2120))
     {        
         char msg[100];
         int count = 0;
