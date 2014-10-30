@@ -26,11 +26,14 @@ int main()
 
             std::stringstream ss;
 
-            ss << "hello" << "," << system_clock::now().time_since_epoch().count() << std::endl;
+			// add packet index and current system time time the stream.
+            ss << index << "," << system_clock::now().time_since_epoch().count() << std::endl;
             
+            // start total sending time
             if (total_time == 0)
                 total_time = system_clock::now().time_since_epoch().count();
-
+			
+			// send stream to the socket
             socket.Send(ss.str());
 
             // update index
@@ -39,16 +42,20 @@ int main()
 
             if (index == 1000) 
             {
+            	// get total sending time
                 total_time = system_clock::now().time_since_epoch().count() - total_time;
 
                 sleep (1);
 
                 ss.str(std::string());
 
+				// add end commant to the socket.
                 ss << "end" << "," << index << std::endl;
     
+				// send stream to the socket
                 socket.Send(ss.str());
 
+				// print results
                 std::cout << "Sent: " << index << " packets."<< std::endl;
                 std::cout << "Total sending time: " << total_time << " us." << std::endl;
 
@@ -56,7 +63,8 @@ int main()
             }
             else 
             {
-                usleep (10000);
+            	// 10 ms works fine
+                usleep (1000);
             }
         }
 

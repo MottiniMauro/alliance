@@ -1,4 +1,4 @@
--- Toroco deviceloader to test signaling
+-- Toroco sensor to test latency
 
 local M = {}
 
@@ -28,9 +28,12 @@ M.init = function (conf)
 
     local udp = selector.new_udp (nil, nil, ip, port, 'line')
 
-	--listen for messages
+	--listen for packets
+	
 	sched.sigrun ({udp.events.data}, function (_, msg) 
 
+    	local trc_time = sched.get_time()
+    	
 		local cmd, num = nil, nil
 
 		if msg then
@@ -41,7 +44,7 @@ M.init = function (conf)
             --num = tonumber (num)
 		end
 		
-        sched.signal (update, cmd, num)
+        sched.signal (update, trc_time, cmd, num)
 		
         return true
 	end)

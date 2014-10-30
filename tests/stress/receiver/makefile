@@ -3,7 +3,7 @@
 #############################################################################
 
 CC = g++ 
-CFLAGS = -Wall -std=c++11
+CFLAGS = -Wall -std=c++0x
 INCLUDES = -I. 
 LIBS = `pkg-config --libs opencv`
 

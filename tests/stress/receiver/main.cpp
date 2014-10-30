@@ -46,7 +46,11 @@ int main()
 
                 ss >> time;
                 
+                // get latancy time of the packet
                 time = received_time - time;
+                //std::cout << "Latency of packet " << cmd << ": " << time << " us." << std::endl;
+                
+				// update sum, total, max and min
                 sum_time += time;
 
                 if (total_time == 0)
