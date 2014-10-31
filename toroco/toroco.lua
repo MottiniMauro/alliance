@@ -259,6 +259,12 @@ local do_device_polling = function (event_desc, time, convert)
     
     -- create a new device polling function, and return the new event
     else
+    
+    	-- check errors
+    	if type(time) ~= "number" then
+        	error ('Torocó error: Refresh time in \'configure_polling()\' must be a number.')
+        end
+    
     	-- polling event
         local event = {}
 
@@ -1173,9 +1179,14 @@ end
 -- @param coroutines     Table with the coroutines of the behavior.
 -- @param params         Values of the behavior parameters.
 
-M.add_behavior = function (behavior_desc, coroutines, params) 
-
+M.add_behavior = function (behavior_desc, coroutines, params)
+    
     local load_behavior = function()
+
+		if M.behaviors [behavior_desc.emitter] then
+			error ('Torocó error: Duplicated behavior \'' .. behavior_desc.emitter.. '\' at load_behavior().')
+		end
+
         -- add behavior to 'M.behaviors'
         M.behaviors [behavior_desc.emitter] = {
             name = behavior_desc.emitter,

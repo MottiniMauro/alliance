@@ -13,7 +13,7 @@ toroco.load_behavior (behavior.move_forward, 'behaviors/trc_move_forward')
 toroco.load_behavior (behavior.turn_left, 'behaviors/trc_turn', {motors_values = {1, 30, 1, 100}})
 toroco.load_behavior (behavior.turn_right, 'behaviors/trc_turn', {motors_values = {1, 100, 1, 30}})
 
---
+-- configure sensor polling
 local converter = function (event_value)
     return event_value
 end
