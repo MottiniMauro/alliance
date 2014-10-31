@@ -308,7 +308,7 @@ local get_real_event = function (event_desc)
             	
             	return do_device_polling (event_desc, 0.1)
             else
-                log ('TORIBIO', 'WARN', 'Event not found for device %s: "%s"', tostring(device), tostring(event_desc.name))
+                error ('Torocó error: Device event \'' .. event_desc.emitter .. '.' .. event_desc.name ..'\' not found.')
             end
         end
 
@@ -318,11 +318,13 @@ local get_real_event = function (event_desc)
 	-- if the event is defined in a behavior, ...
     elseif event_desc.type == 'behavior' then 
 
-        local behavior = M.wait_for_behavior (event_desc.emitter)     
+        local behavior = M.wait_for_behavior (event_desc.emitter)
        
-        if not behavior.events[event_desc.name] then 
-            behavior.events[event_desc.name] = {}
-            behavior.event_count = behavior.event_count + 1
+        if not behavior.events[event_desc.name] then
+        
+        	--error ('Torocó error: Behavior event \'' .. event_desc.emitter .. '.' .. event_desc.name ..'\' not found.')
+	        behavior.events[event_desc.name] = {}
+	        behavior.event_count = behavior.event_count + 1
         end
 
         return behavior.events[event_desc.name]
@@ -507,8 +509,13 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
     end
 
     for _, input_source in ipairs (input_sources) do
+    
         -- add the receiver to registered_receivers
         local event = get_real_event (input_source)
+        
+        if not event then
+        	error ('Torocó error: Input event \'' .. input_source.emitter .. '.' .. input_source.name .. '\' not found.')
+        end
 
         if not registered_receivers [event] then
             registered_receivers [event] = {}
@@ -656,7 +663,7 @@ M.send_output = function (output_values)
     	-- Warning: the event is not defined at the send_output invocation
         else
             sched.schedule_signal (event)
-            print ('Warning: Missing event ' .. event_name .. ' at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
+            print ('Torocó warning: Missing event ' .. event_name .. ' at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
         end
     end
 
@@ -666,7 +673,7 @@ M.send_output = function (output_values)
         count = count + 1
     end
     if count > M.behavior_taskd [sched.running_task].event_count then
-        print ('Warning: Unused events at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
+        print ('Torocó warning: Unused events at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
     end
 
     sched.wait()
@@ -691,7 +698,7 @@ M.set_output = function (output_values)
 
         if not event then
             event = get_real_event(M.behavior[beh.name][event_name])
-            print ('Warning: Unused event \'' .. event_name .. '\' at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
+            print ('Torocó warning: Unused event \'' .. event_name .. '\' at send_output() in behavior ' .. M.behavior_taskd [sched.running_task].name .. '.')
         end
         
         -- set the event as active with the new values.
@@ -1146,7 +1153,17 @@ end
 
 M.load_behavior = function (behavior_desc, pathname, params)
 
-    M.add_behavior (behavior_desc, {dofile (pathname..'.lua')}, params)
+	-- load behavior file
+	local behavior_file = loadfile (pathname..'.lua')
+	if not behavior_file then
+		error ('Torocó error: behavior file \'' .. pathname.. '.lua\' not found.')
+	end
+	
+	-- execute file and get coroutines
+	coroutines = {behavior_file()}
+	
+	-- add behavior to Torocó
+    M.add_behavior (behavior_desc, coroutines, params)
 end
 
 
@@ -1208,7 +1225,8 @@ end
 -- @param[opt] toribio_conf_file Configuration filename.
 
 M.run = function(toribio_conf_file)
-    if toribio_conf then
+
+    if toribio_conf_file then
         M.load_configuration(toribio_conf_file)
     else
         M.load_configuration('toribio.conf')
@@ -1225,8 +1243,14 @@ end
 -- @param file Configuration filename.
 
 M.load_configuration = function(file)
+
+	-- load configuration file
 	local func_conf, err = loadfile(file)
-	assert(func_conf,err)
+	if not func_conf then
+		error ('Torocó error: configuration file \'' .. file .. '\' not found.')
+	end
+	
+	-- configure the system
 	local conf = toribio.configuration
 	local meta_create_on_query 
 	meta_create_on_query = {

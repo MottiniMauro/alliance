@@ -11,3 +11,5 @@
 
 nixio.so
 nixio
+
+tests/stress/receiver/results.txt

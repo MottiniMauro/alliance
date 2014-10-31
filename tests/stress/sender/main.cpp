@@ -26,7 +26,7 @@ int main()
 
             std::stringstream ss;
 
-			// add packet index and current system time time the stream.
+			// add packet index and current system time to the stream.
             ss << index << "," << system_clock::now().time_since_epoch().count() << std::endl;
             
             // start total sending time
@@ -64,7 +64,7 @@ int main()
             else 
             {
             	// 10 ms works fine
-                usleep (1000);
+                usleep (10000);
             }
         }
 
