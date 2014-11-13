@@ -7,7 +7,7 @@ CFLAGS = -Wall -std=c++0x
 INCLUDES = -I. 
 LIBS = `pkg-config --libs opencv`
 
-SRCS = ColorDetect.cpp Socket.cpp main.cpp
+SRCS = ColorDetect.cpp SocketUdp.cpp main.cpp
 
 # define the C object files 
 #

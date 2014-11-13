@@ -138,6 +138,9 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 cv::Point2i ColorDetect::detect()
 {	
     cv::Mat img;
+    
+    vcap.grab();
+    vcap.grab();
 
     vcap >> img;
 
