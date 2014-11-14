@@ -12,4 +12,7 @@
 nixio.so
 nixio
 
+output.avi
+vision
+
 tests/stress/receiver/results.txt
