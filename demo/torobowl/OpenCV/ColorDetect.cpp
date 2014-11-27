@@ -5,8 +5,6 @@
 
 ColorDetect::ColorDetect()
 {
-
-	writer2 = std::unique_ptr< cv::VideoWriter > (new cv::VideoWriter("output.avi", CV_FOURCC('D', 'I', 'V', 'X'), 5, cv::Size(640, 480), true));
 	getVideo();
 }
 
@@ -17,13 +15,11 @@ void ColorDetect::getVideo()
 	vcap.open(0); //0 = connected webcam
 
     // set video image size
-    vcap.set(CV_CAP_PROP_FRAME_WIDTH, VIDEO_WINDOW_WIDTH);
-    vcap.set(CV_CAP_PROP_FRAME_HEIGHT, VIDEO_WINDOW_HEIGHT);
+    //vcap.set(CV_CAP_PROP_FRAME_WIDTH, VIDEO_WINDOW_WIDTH);
+    //vcap.set(CV_CAP_PROP_FRAME_HEIGHT, VIDEO_WINDOW_HEIGHT);
 	
 	if (!vcap.isOpened())
 		std::cout << "Could not open video input stream" << std::endl;
-	if (!writer2->isOpened())
-		std::cout << "Could not open video output stream" << std::endl;
 	
 }
 
@@ -31,10 +27,9 @@ void ColorDetect::getVideo()
 
 cv::Mat getThresh_Red (const cv::Mat &inImg)
 {
-	cv::Mat tmpImg = inImg;
-	cv::Mat imgThresh(tmpImg.size(), tmpImg.type());
+	cv::Mat imgThresh(inImg.size(), inImg.type());
 	
-	cv::inRange(tmpImg, cv::Scalar(0, 50, 50), cv::Scalar(20, 200, 255), imgThresh);
+	cv::inRange(inImg, cv::Scalar(0, 50, 50), cv::Scalar(20, 200, 255), imgThresh);
 	
 	return imgThresh;
 }
@@ -43,10 +38,9 @@ cv::Mat getThresh_Red (const cv::Mat &inImg)
 
 cv::Mat getThresh_Turquoise (const cv::Mat &inImg)
 {
-	cv::Mat tmpImg = inImg;
-	cv::Mat imgThresh(tmpImg.size(), tmpImg.type());
+	cv::Mat imgThresh(inImg.size(), inImg.type());
 	
-	cv::inRange(tmpImg, cv::Scalar(30, 30, 50), cv::Scalar(170, 200, 255), imgThresh);
+	cv::inRange(inImg, cv::Scalar(30, 30, 50), cv::Scalar(170, 200, 255), imgThresh);
 	
 	return imgThresh;
 }
@@ -103,27 +97,31 @@ void colorFilter_Turquoise (cv::Mat &cvtImg) {
 			int saturation = cvtImg.at<cv::Vec3b>(indx,indy)[2];
 			
 			// remove green-blue
-			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] < 60) {
+			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] < 50) {
 				saturation = 0;
 			}
 			
-			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] > 160) {
+			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] > 170) {
 				saturation = 0;
 			}
 			
 				
 			// remove black
-			if (lightness < 50) {
+			if (lightness < 60) {
 				saturation = 0;
+			}
+
+            if (saturation < 110 && lightness < 80) {
+				//saturation = 0;
 			}
 		
 			// remove grey
-			if (saturation < 40) {
-	//			saturation = 0;
+			if (saturation < 60) {
+				saturation = 0;
 			}
 		
 			// remove white
-			if (lightness > 160) {
+			if (lightness > 140) {
 				saturation = 0;
 			}
 			
@@ -149,7 +147,7 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 			cvtImg.at<cv::Vec3b>(indx,indy)[0] = (cvtImg.at<cv::Vec3b>(indx,indy)[0] + 10) % 180;
 			
 			// remove non-red
-			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] > 12) {
+			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] > 14) {
 				saturation = 0;
 			}
 			
@@ -163,14 +161,18 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 				}
 			
 				// remove grey
-				if (saturation < 40) {
-		//			saturation = 0;
+				if (saturation < 60) {
+				//	saturation = 0;
 				}
 			
 				// remove white
-				if (lightness > 200) {
+				if (lightness > 130) {
 					saturation = 0;
 				}
+
+                if (saturation < 120 && lightness < 110) {
+				   // saturation = 0;
+			    }
 			
 				// remove skin
 				if ((saturation < 80) && (lightness > 130)) {
@@ -194,9 +196,6 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 cv::Point2i ColorDetect::detect (int color)
 {	
     cv::Mat img;
-    
-    vcap.grab();
-    vcap.grab();
 
     vcap >> img;
 
@@ -204,43 +203,43 @@ cv::Point2i ColorDetect::detect (int color)
 	cv::Mat element1(4, 4, CV_8U, cv::Scalar(1));
 	cv::Mat element2(6, 6, CV_8U, cv::Scalar(1));
 	std::vector<std::vector<cv::Point> > contours;
-	in = img;
 	
 	// transform image from BGR to HLS
-	cv::cvtColor(in, cvtImg, CV_BGR2HLS, 0);
+	cv::cvtColor(img, img, CV_BGR2HLS, 0);
 	
 	// apply color filter
 	
 	if (color == 1) {
-		colorFilter_Red (cvtImg);
+		colorFilter_Red (img);
 	}
 	else {
-		colorFilter_Turquoise (cvtImg);
+		colorFilter_Turquoise (img);
 	}
 	
 	//colorFilter_8Bit (cvtImg);
 	//colorFilter_Saturate (cvtImg);
 	
 	// transform image back from HLS to BGR
-	cv::cvtColor(cvtImg, bettoImg, CV_HLS2BGR, 0);
+	cv::cvtColor(img, bettoImg, CV_HLS2BGR, 0);
 	
 	// transform image to binary
 	if (color == 1) {
-		thrImg = getThresh_Red (cvtImg);
+		thrImg = getThresh_Red (img);
 	}
 	else {
-		thrImg = getThresh_Turquoise (cvtImg);
+		thrImg = getThresh_Turquoise (img);
 	}
 
 	// simplify the image
 	//dImg = thrImg;
-		
-	cv::dilate(thrImg, dImg, element1);
-	cv::dilate(dImg, dImg, element1);
 	for (int h = 0; h>2; h++)
 	{
 		cv::erode(dImg, dImg, element2);
 	}
+	cv::dilate(thrImg, dImg, element1);
+	//cv::dilate(dImg, dImg, element1);
+
+	cv::blur (dImg, dImg, cv::Size(4,4));
 
 	// find blobs
 	cv::findContours(dImg, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
@@ -271,7 +270,7 @@ cv::Point2i ColorDetect::detect (int color)
         center = cv::Point2f(superRect.tl().x + superRect.size().width / 2, superRect.tl().y + superRect.size().height / 2);
 
         // draw center in video window
-        cv::line( bettoImg, center, center + cv::Point2f( 2, 0), cv::Scalar( 0, 0, 255), 15 );
+        cv::line( bettoImg, center, center + cv::Point2f( 2, 0), cv::Scalar( 0, color?0:255, color?255:0), 7 );
 
 	    /*
 	    for (unsigned int j = 0; j < contours.size(); j++)
@@ -283,10 +282,10 @@ cv::Point2i ColorDetect::detect (int color)
         // draw blob in video window
 	
 	    if (superArea > 0) {
-		    cv::rectangle(bettoImg, superRect, cv::Scalar(0, 255, 0), 2);
+		    cv::rectangle(bettoImg, superRect, cv::Scalar(0, color?0:255, color?255:0), 1);
 	    }
     }
-		
+	
     cv::imshow("Color Detect", bettoImg);
 
     // normalize blob center to -100 to +100.

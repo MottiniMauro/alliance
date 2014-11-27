@@ -1,3 +1,6 @@
 [submodule "toribio"]
 	path = toribio
-	url = https://github.com/xopxe/Toribio.git
+	url = https://github.com/AgusCT/Toribio
+[submodule "pru/vendors/am335x_pru_package"]
+	path = pru/vendors/am335x_pru_package
+	url = https://github.com/AgusCT/am335x_pru_package.git

@@ -27,7 +27,7 @@ M.init = function(conf)
 
 	--- Prints the values passed
 	device.setvel2mtr=function(...)
-		--print('trc_motor: ', ...)
+		print('trc_motor: ', ...)
 	end
 	
 	toribio.add_device(device)

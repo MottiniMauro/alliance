@@ -8,13 +8,16 @@ local params = toroco.params
 
 local handler1 = function (event, x, y)
 
-    print ('\nred follower: x =', x)
-    
     if not x then
-        print ('nothing')
+        --print ('nothing')
         toroco.unset_output ()
+        
+        return
+    end
 
-    elseif x < -50 then
+    print ('\nred follower: x =', x)
+
+    if x < -50 then
         print ('turn left ')
         toroco.set_output {motors_setvel = params.motors_lx}
 

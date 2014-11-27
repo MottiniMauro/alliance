@@ -44,13 +44,13 @@ int main()
                 ss << color_center.x << "," << color_center.y << std::endl;
             }
             else {
-                ss << "none" << std::endl;
+                ss << -999 << "," << -999 << std::endl;
             }
     
     		// send message
             socket.Send(ss.str());
 
-		    if (cv::waitKey(45) >= 0) 
+		    if (cv::waitKey(1) >= 0) 
                 break;
         }
 
