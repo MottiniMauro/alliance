@@ -26,8 +26,8 @@ toroco.load_behavior (behavior.trq_follower, 'behaviors/trq_follower', {
     motors_rx = {10, 50}
 })
 
-toroco.load_behavior (behavior.trc_avoid_left, 'behaviors/trc_avoid', {motors_vel = {10, 50}})
-toroco.load_behavior (behavior.trc_avoid_right, 'behaviors/trc_avoid', {motors_vel = {50, 10}})
+toroco.load_behavior (behavior.trc_avoid_left, 'behaviors/trc_avoid', {motors_vel = {50, 0}})
+toroco.load_behavior (behavior.trc_avoid_right, 'behaviors/trc_avoid', {motors_vel = {0, 50}})
 
 toroco.load_behavior (behavior.trc_button, 'behaviors/trc_button')
 

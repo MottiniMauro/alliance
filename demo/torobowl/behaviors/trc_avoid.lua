@@ -9,10 +9,10 @@ local params = toroco.params
 local handler1 = function (event, value)
 
     if value > 0 then
-        print ('Avoiding!')
+        print ('*-*-*-* Avoiding!')
         toroco.set_output {motors_setvel = params.motors_vel}
     else
-        print ('Avoiding stopped!')
+        print ('-*-*-*- Avoiding stopped!')
         toroco.unset_output ()
     end
 end
