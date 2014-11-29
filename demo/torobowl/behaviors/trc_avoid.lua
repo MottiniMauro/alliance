@@ -10,7 +10,7 @@ local handler1 = function (event, value)
 
     if value > 0 then
         print ('Avoiding!')
-        --toroco.set_output {motors_setvel = params.motors_lx}
+        toroco.set_output {motors_setvel = params.motors_vel}
     else
         print ('Avoiding stopped!')
         toroco.unset_output ()

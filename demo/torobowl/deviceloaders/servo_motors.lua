@@ -26,10 +26,13 @@ M.init = function(conf)
     sched.sleep(1)
 
     -- set pwm period and polarity
-    run_shell('echo 20000000 > /sys/devices/ocp.3/pwm_test_P9_22.16/period')
-    run_shell('echo 20000000 > /sys/devices/ocp.3/pwm_test_P9_14.15/period')
-    run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_22.16/polarity')
-    run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_14.15/polarity')
+    run_shell('echo 20000000 > /sys/devices/ocp.3/pwm_test_P9_22.17/period')
+    run_shell('echo 20000000 > /sys/devices/ocp.3/pwm_test_P9_14.16/period')
+    run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_22.17/polarity')
+    run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_14.16/polarity')
+
+    run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_22.17/run')
+    run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_14.16/run')
 
 	local devicename='servo_motors'
 	
@@ -50,8 +53,21 @@ M.init = function(conf)
 	--- Prints the values passed
     -- @vel must be between -100 and +100
 	device.setvel2mtr=function(vel1, vel2)
-        run_shell('echo '.. 1457500 + vel2*2000 ..' > /sys/devices/ocp.3/pwm_test_P9_14.15/duty')
-        run_shell('echo '.. 1452000 - vel1*2050 ..' > /sys/devices/ocp.3/pwm_test_P9_22.16/duty')
+        run_shell('echo '.. 1457500 + vel2*2000 ..' > /sys/devices/ocp.3/pwm_test_P9_14.16/duty')
+        run_shell('echo '.. 1452000 - vel1*2050 ..' > /sys/devices/ocp.3/pwm_test_P9_22.17/duty')
+	end
+
+	device.enable=function(motor1, motor2)
+        if motor1 then  
+            run_shell('echo 1 > /sys/devices/ocp.3/pwm_test_P9_22.17/run')
+        else
+            run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_22.17/run')
+        end
+        if motor2 then
+            run_shell('echo 1 > /sys/devices/ocp.3/pwm_test_P9_14.16/run')
+        else
+            run_shell('echo 0 > /sys/devices/ocp.3/pwm_test_P9_14.16/run')
+        end
 	end
 	
 	toribio.add_device(device)

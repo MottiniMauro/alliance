@@ -60,11 +60,13 @@ M.init = function (conf)
         
         if msg then
             sensor_num, value = msg:match ('^([^,]+),([^,]+)$')
-            sensor_num = sensor_num + 1
-            value = tonumber(value)
-            --print ('sensor_num', sensor_num, 'value', value) 
-            
-            sched.signal (devices[sensor_num].events.update, value)
+            if sensor_num then
+                sensor_num = sensor_num + 1
+                value = tonumber(value)
+                print ('sensor_num', sensor_num, 'value', value) 
+                
+                sched.signal (devices[sensor_num].events.update, value)
+            end
         end
 
         return true
