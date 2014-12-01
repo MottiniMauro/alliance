@@ -191,7 +191,7 @@ local dispatch_signal = function (event, filter_receiver, ...)
                     if receiver.execute_count and receiver.execute_count == 0 then
                         table.remove(registered_receivers [event], i)
 
-                    elseif not receiver.is_executing then
+                    else
                         if receiver.execute_count then
                             receiver.execute_count = receiver.execute_count - 1
                         end
@@ -535,9 +535,7 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
     -- initialize the callback function
     local mx = mutex.new()
     local fsynched = mx:synchronize (function(_, ...)
-            receiver.is_executing = true
             input_handler(input_name, ...)
-            receiver.is_executing = nil
         end
     )
 
