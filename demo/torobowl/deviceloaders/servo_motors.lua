@@ -53,7 +53,7 @@ M.init = function(conf)
 	--- Prints the values passed
     -- @vel must be between -100 and +100
 	device.setvel2mtr=function(vel1, vel2)
-        run_shell('echo '.. 1455150 + vel2*2050 ..' > /sys/devices/ocp.3/pwm_test_P9_14.16/duty')
+        run_shell('echo '.. 1455150 + vel2*2060 ..' > /sys/devices/ocp.3/pwm_test_P9_14.16/duty')
         run_shell('echo '.. 1449950 - vel1*2000 ..' > /sys/devices/ocp.3/pwm_test_P9_22.17/duty')
 	end
 
