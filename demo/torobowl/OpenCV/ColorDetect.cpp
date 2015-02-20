@@ -29,7 +29,7 @@ cv::Mat getThresh_Red (const cv::Mat &inImg)
 {
 	cv::Mat imgThresh(inImg.size(), inImg.type());
 	
-	cv::inRange(inImg, cv::Scalar(0, 50, 50), cv::Scalar(20, 200, 255), imgThresh);
+	cv::inRange(inImg, cv::Scalar(0, 15, 20), cv::Scalar(20, 200, 255), imgThresh);
 	
 	return imgThresh;
 }
@@ -40,7 +40,7 @@ cv::Mat getThresh_Turquoise (const cv::Mat &inImg)
 {
 	cv::Mat imgThresh(inImg.size(), inImg.type());
 	
-	cv::inRange(inImg, cv::Scalar(30, 30, 50), cv::Scalar(170, 200, 255), imgThresh);
+	cv::inRange(inImg, cv::Scalar(30, 30, 30), cv::Scalar(170, 200, 255), imgThresh);
 	
 	return imgThresh;
 }
@@ -97,7 +97,7 @@ void colorFilter_Turquoise (cv::Mat &cvtImg) {
 			int saturation = cvtImg.at<cv::Vec3b>(indx,indy)[2];
 			
 			// remove green-blue
-			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] < 50) {
+			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] < 80) {
 				saturation = 0;
 			}
 			
@@ -107,21 +107,22 @@ void colorFilter_Turquoise (cv::Mat &cvtImg) {
 			
 				
 			// remove black
-			if (lightness < 60) {
-				saturation = 0;
+			if (lightness < 20) {
+				//saturation = 0;
 			}
 
-            if (saturation < 110 && lightness < 80) {
-				//saturation = 0;
+			// remove grey
+            if (saturation < 120 && lightness < 80) {
+	//			saturation = 0;
 			}
 		
 			// remove grey
-			if (saturation < 60) {
+			if (saturation < 40) {
 				saturation = 0;
 			}
 		
 			// remove white
-			if (lightness > 140) {
+			if (lightness > 130) {
 				saturation = 0;
 			}
 			
@@ -144,10 +145,10 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 			int saturation = cvtImg.at<cv::Vec3b>(indx,indy)[2];
 			
 			// tweak red
-			cvtImg.at<cv::Vec3b>(indx,indy)[0] = (cvtImg.at<cv::Vec3b>(indx,indy)[0] + 10) % 180;
+			cvtImg.at<cv::Vec3b>(indx,indy)[0] = (cvtImg.at<cv::Vec3b>(indx,indy)[0] + 15) % 180;
 			
 			// remove non-red
-			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] > 14) {
+			if (cvtImg.at<cv::Vec3b>(indx,indy)[0] > 25) {
 				saturation = 0;
 			}
 			
@@ -156,17 +157,17 @@ void colorFilter_Red (cv::Mat &cvtImg) {
 				cvtImg.at<cv::Vec3b>(indx,indy)[0] = cvtImg.at<cv::Vec3b>(indx,indy)[0] / 2;
 				
 				// remove black
-				if (lightness < 50) {
+				if (lightness < 10) {
 					saturation = 0;
 				}
 			
 				// remove grey
-				if (saturation < 60) {
+				if (saturation < 30) {
 				//	saturation = 0;
 				}
 			
 				// remove white
-				if (lightness > 130) {
+				if (lightness > 150) {
 					saturation = 0;
 				}
 

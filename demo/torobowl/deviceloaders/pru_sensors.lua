@@ -59,7 +59,7 @@ M.init = function (conf)
     selector.fork_run (read_sensor, nil, function(_, msg)
         
         if msg then
-            sensor_num, value = msg:match ('([^,]+),([^,]+)$')
+            local sensor_num, value = msg:match (';([^,]+),([^,]+)$')
             if sensor_num then
                 sensor_num = sensor_num + 1
                 value = tonumber(value)

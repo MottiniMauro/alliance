@@ -488,7 +488,8 @@ local register_dispatcher = function(event)
     inhibited_events [event] = inhibited_events [event] or {}
 
     local waitd = {
-        event
+        event,
+        buff_mode = 'keep_last'
     }
 
     local no_filter_receiver = function (event, ...)
@@ -540,7 +541,8 @@ local register_handler = function(behavior_name, input_name, input_sources, inpu
     )
 
     local waitd = {
-		receiver.event_alias
+		receiver.event_alias,
+        buff_mode = 'keep_last'
 	}
 
  	local taskd = sched.run( function()
@@ -599,6 +601,7 @@ M.wait_for_input = function(input_desc, timeout)
     local waitd = {
 		receiver.event_alias,
 		timeout = timeout,
+        buff_mode = 'keep_last'
 	}
 
     local key = #M.behavior_taskd [sched.running_task].receivers
@@ -926,7 +929,8 @@ M.set_inputs = function (receiver_desc, inputs)
                 end)
 
                 local waitd = {
-	                M.events.release [event]
+	                M.events.release [event],
+                    buff_mode = 'keep_last'
                 }
 
              	local taskd = sched.new_task( function()
