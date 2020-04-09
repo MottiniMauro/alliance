@@ -1,0 +1,482 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>Torocó - Reference manual</title>
+    <link rel="stylesheet" href="ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>ldoc</h1>
+
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><strong>toroco</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>toroco</code></h1>
+<p>Main file of Torocó.</p>
+<p></p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Author</strong>: Ignacio Bettosini and Agustín Clavelli</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#configure_polling">configure_polling (event_desc, time, converter)</a></td>
+	<td class="summary">Configures a device polling function.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#wait_for_input">wait_for_input (input_desc[, timeout])</a></td>
+	<td class="summary">Wait for an input.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#send_output">send_output (output_values)</a></td>
+	<td class="summary">Send the behavior output.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#set_output">set_output (output_values)</a></td>
+	<td class="summary">Set the behavior output.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#unset_output">unset_output ()</a></td>
+	<td class="summary">Set the behavior output.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#set_inputs">set_inputs (receiver_desc, inputs)</a></td>
+	<td class="summary">Set the behavior inputs.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#set_inhibitors">set_inhibitors (emitter_desc, outputs_inhibitors)</a></td>
+	<td class="summary">Sets the inhibitors for an emitter.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#trigger">trigger (input_desc, handler)</a></td>
+	<td class="summary">Create a trigger function.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#suspend_behavior">suspend_behavior (behavior_desc)</a></td>
+	<td class="summary">Suspend a behavior.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#resume_behavior">resume_behavior (behavior_desc)</a></td>
+	<td class="summary">Resume a behavior.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#remove_behavior">remove_behavior (behavior_desc)</a></td>
+	<td class="summary">Resume a behavior.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#load_behavior">load_behavior (behavior_desc, pathname, params)</a></td>
+	<td class="summary">Registers a behavior to Torocó.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#add_behavior">add_behavior (behavior_desc, coroutines, params)</a></td>
+	<td class="summary">Adds a behavior to Torocó.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#run">run ([toribio_conf_file])</a></td>
+	<td class="summary">Torocó main function.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#load_configuration">load_configuration (file)</a></td>
+	<td class="summary">Load Torocó configuration file.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "configure_polling"></a>
+    <strong>configure_polling (event_desc, time, converter)</strong>
+    </dt>
+    <dd>
+    Configures a device polling function.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">event_desc</span>
+         Event descriptor (return value of /toroco/device)
+        </li>
+        <li><span class="parameter">time</span>
+          	 Refresh time in seconds
+        </li>
+        <li><span class="parameter">converter</span>
+          Function for converting the raw value
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "wait_for_input"></a>
+    <strong>wait_for_input (input_desc[, timeout])</strong>
+    </dt>
+    <dd>
+    Wait for an input.  ///
+ This function pauses a coroutine or trigger handler
+ until an input is received.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">input_desc</span>
+              Input descriptor (return value of /toroco/input)
+        </li>
+        <li><span class="parameter">timeout</span>
+            Number of seconds to wait or return nil.
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        List of extra parameters of the received event. If there is none, it returns nil.
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "send_output"></a>
+    <strong>send_output (output_values)</strong>
+    </dt>
+    <dd>
+    Send the behavior output.  ///
+ This function sends the output of a behavior, that is,
+ it sends a signal for each output event of the behavior.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">output_values</span>
+         Table with the extra parameters for each event.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "set_output"></a>
+    <strong>set_output (output_values)</strong>
+    </dt>
+    <dd>
+    Set the behavior output.  ///
+ This function sets the output of a behavior, that is,
+ it sets a signal for each output event of the behavior.
+ If any of the output events is inhibited/suppressed and then released,
+ it resends the signal to the targets.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">output_values</span>
+         Table with the extra parameters for each signal.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "unset_output"></a>
+    <strong>unset_output ()</strong>
+    </dt>
+    <dd>
+    Set the behavior output.  ///
+ This function unsets the output of a behavior, that is,
+ it unsets the signals for each output event of the behavior.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "set_inputs"></a>
+    <strong>set_inputs (receiver_desc, inputs)</strong>
+    </dt>
+    <dd>
+    Set the behavior inputs.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">receiver_desc</span>
+          Receiver descriptor (return value of /toroco/behavior)
+        </li>
+        <li><span class="parameter">inputs</span>
+                 Table where the keys are the input names
+ and the values are input descriptors (return value of /toroco/device or /toroco/behavior)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "set_inhibitors"></a>
+    <strong>set_inhibitors (emitter_desc, outputs_inhibitors)</strong>
+    </dt>
+    <dd>
+    Sets the inhibitors for an emitter.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">emitter_desc</span>
+                Emitter descriptor (return value of /toroco/behavior or /toroco/device).
+        </li>
+        <li><span class="parameter">outputs_inhibitors</span>
+          Table of inhibitors for each output event.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "trigger"></a>
+    <strong>trigger (input_desc, handler)</strong>
+    </dt>
+    <dd>
+    Create a trigger function.  ///
+ Returns a coroutine that implements the trigger.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">input_desc</span>
+          Input descriptor (return value of /toroco/input)
+        </li>
+        <li><span class="parameter">handler</span>
+             function to be called when the input is received.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "suspend_behavior"></a>
+    <strong>suspend_behavior (behavior_desc)</strong>
+    </dt>
+    <dd>
+    Suspend a behavior.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">behavior_desc</span>
+          Behavior descriptor (return value of /toroco/behavior)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "resume_behavior"></a>
+    <strong>resume_behavior (behavior_desc)</strong>
+    </dt>
+    <dd>
+    Resume a behavior.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">behavior_desc</span>
+          Behavior descriptor (return value of /toroco/behavior)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "remove_behavior"></a>
+    <strong>remove_behavior (behavior_desc)</strong>
+    </dt>
+    <dd>
+    Resume a behavior.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">behavior_desc</span>
+          Behavior descriptor (return value of /toroco/behavior)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "load_behavior"></a>
+    <strong>load_behavior (behavior_desc, pathname, params)</strong>
+    </dt>
+    <dd>
+    Registers a behavior to Torocó.  ///
+ This function loads a behavior from a file.
+ After loading the behaviors, add_behavior must be executed.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">behavior_desc</span>
+          Behavior descriptor (return value of /toroco/behavior).
+        </li>
+        <li><span class="parameter">pathname</span>
+               Behavior filepath.
+        </li>
+        <li><span class="parameter">params</span>
+                 Values of the behavior parameters.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "add_behavior"></a>
+    <strong>add_behavior (behavior_desc, coroutines, params)</strong>
+    </dt>
+    <dd>
+    Adds a behavior to Torocó.  ///
+ This function adds a behavior to Torocó.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">behavior_desc</span>
+          Behavior descriptor (return value of /toroco/behavior).
+        </li>
+        <li><span class="parameter">coroutines</span>
+             Table with the coroutines of the behavior.
+        </li>
+        <li><span class="parameter">params</span>
+                 Values of the behavior parameters.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "run"></a>
+    <strong>run ([toribio_conf_file])</strong>
+    </dt>
+    <dd>
+    Torocó main function.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">toribio_conf_file</span>
+         Configuration filename.
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "load_configuration"></a>
+    <strong>load_configuration (file)</strong>
+    </dt>
+    <dd>
+    Load Torocó configuration file.  ///
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">file</span>
+         Configuration filename.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
+<i style="float:right;">Last updated 2015-02-19 18:51:44 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>
