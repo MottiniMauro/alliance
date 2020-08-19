@@ -28,7 +28,6 @@ M.input = require 'toroco.input'
 M.output = require 'toroco.output'
 M.device = require 'toroco.device'
 M.behavior = require 'toroco.behavior'
-M.behavior_set = require 'toroco.behavior_set'
 
 require 'lumen.tasks.selector'.init({service='nixio'})
 
@@ -50,10 +49,6 @@ require 'lumen.tasks.selector'.init({service='nixio'})
 --	suppression_targets: Target events to be suppressed by each output event of the behavior.
 
 M.behaviors = {}
-
--- /// behavior_sets ///
-
-M.behavior_sets = {}
 
 -- /// behavior_taskd ///
 -- Behavior of each coroutine.
@@ -100,6 +95,7 @@ local registered_receivers = {}
 --	expire_time: sched.get_time() + timeout.
 
 local inhibited_events = {}
+
 
 -- /// M.devices ///
 
@@ -258,7 +254,10 @@ end
 local do_device_polling = function (event_desc, time, convert)
     -- return the event of the device polling function
     if polling_devices[event_desc.emitter] and polling_devices[event_desc.emitter][event_desc.name] then
+
         return polling_devices[event_desc.emitter][event_desc.name].event
+    
+    -- create a new device polling function, and return the new event
     else
     
     	-- check errors
@@ -759,36 +758,6 @@ M.unset_output = function ()
     end
 end
 
--- M.unset_outputs = function (behavior_desc)
---     local behavior = M.behaviors[behavior_desc]
---     local tasks = M.behaviors[behavior_desc].tasks
-
---     for i = #tasks, 1, -1 do
---         local beh = tasks[i]
-
---         for event_name, event in pairs(beh.events) do
-            
---             if M.active_events [event] then
---                 -- set the event as inactive
---                 M.active_events [event] = nil
-                    
---                 -- release the inhibitions for the event
---                 for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
-
---                     release_inhibition (M.behavior_taskd [sched.running_task], inhibition_target)
---                 end
-
---                 -- release the suppressions for the event
---                 for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
---                     release_suppression (M.behavior_taskd [sched.running_task], suppression_target.event, suppression_target.receiver)
---                 end
---             end
---         end
---     end
--- end
-
-
-
 -- add coroutine to a behavior
 -- behavior_desc: behavior descriptor (return value of /toroco/behavior)
 -- coroutine: function to be executed.
@@ -1078,30 +1047,10 @@ end
 -- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior)
 
 M.suspend_behavior = function (behavior_desc)
+
     local tasks = M.behaviors [behavior_desc.emitter].tasks
 
     for i = #tasks, 1, -1 do
-
-        local beh = M.behavior_taskd [tasks[i]]
-
-        for event_name, event in pairs(beh.events) do
-            
-            if M.active_events [event] then
-                -- set the event as inactive
-                M.active_events [event] = nil
-                    
-                -- release the inhibitions for the event
-                for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
-
-                    release_inhibition (beh, inhibition_target)
-                end
-
-                -- release the suppressions for the event
-                for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
-                    release_suppression (beh, suppression_target.event, suppression_target.receiver)
-                end
-            end
-        end
 
         if tasks [i].status ~= 'dead' then
             sched.set_pause (tasks [i], true)
@@ -1284,38 +1233,6 @@ M.add_behavior = function (behavior_desc, coroutines, params)
     sched.new_task(load_behavior)
 end
 
-M.load_behavior_set = function (behavior_set_desc, behaviors)
-    local load_behavior_set = function()
-        if M.behavior_sets [behavior_set_desc.emitter] then
-            error ('Torocó error: Duplicated behavior set \'' .. behavior_set_desc.emitter.. '\' at load_behavior_set().')
-        end
-
-        -- add behavior_set to 'M.behavior_sets'
-        M.behavior_sets [behavior_set_desc.emitter] = {
-            name = behavior_set_desc.emitter,
-            behaviors = behaviors
-        }
-    end
-    sched.new_task(load_behavior_set)
-end
-
-M.suspend_behavior_set = function (behavior_set_desc)
-    local suspend_behavior_set = function()
-        for _, behavior in ipairs(M.behavior_sets [behavior_set_desc].behaviors) do
-            M.suspend_behavior(behavior)
-        end
-    end
-    sched.new_task(suspend_behavior_set)
-end
-
-M.resume_behavior_set = function (behavior_set_desc)
-    local resume_behavior_set = function()
-        for _, behavior in ipairs(M.behavior_sets [behavior_set_desc].behaviors) do
-            M.resume_behavior(behavior)
-        end
-    end
-    sched.new_task(resume_behavior_set)
-end
 
 ---- Torocó main function. ///
 -- @param[opt] toribio_conf_file Configuration filename.
@@ -1366,6 +1283,12 @@ M.load_configuration = function(file)
 		        log ('TORIBIOGO', 'DETAIL', 'Processing conf %s %s: %s', section, task, tostring((conf and conf.load) or false))
 
 		        if conf and conf.load then
+			        --[[
+			        local taskmodule = require (section..'/'..task)
+			        if taskmodule.start then
+				        local ok = pcall(taskmodule.start,conf)
+			        end
+			        --]]
 			        log ('TORIBIOGO', 'INFO', 'Starting %s %s', section, task)
 			        toribio.start(section, task)
 		        end
