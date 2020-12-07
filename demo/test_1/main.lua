@@ -22,26 +22,23 @@ local recive_converter = function (event_value)
 end
 
 toroco.configure_polling (device.camera.get_value, 0.00001, basic_converter)
-toroco.configure_polling (device.pose.get_value, 0.00001, basic_converter)
+toroco.configure_polling (device.proximity.get_value, 0.00001, basic_converter)
 toroco.configure_polling (device.listener.recive_updates, 0.1, recive_converter)
 
 toroco.configure_notifier (device.listener.send_updates)
 
-toroco.load_behavior (behavior.follow_rabbit, 'behaviors/follow_rabbit', {found_objective = {false, false}})
-toroco.load_behavior (behavior.follow_mouse, 'behaviors/follow_mouse', {found_objective = {false, false}})
+toroco.load_behavior (behavior.collect_balls2, 'behaviors/collect_balls2', {found_objective = {false, false}})
+toroco.load_behavior (behavior.collect_balls1, 'behaviors/collect_balls1', {found_objective = {false, false}})
 
 toroco.load_behavior (behavior.wander, 'behaviors/wander', {motors_values = {'0', '0'}})
-toroco.load_behavior (behavior.avoid_collisions, 'behaviors/avoid_collisions', {found_object = {false, false}})
 toroco.load_behavior (behavior.direction, 'behaviors/direction', {motors_setvel = {'0', '0'}})
 
-toroco.set_inputs (behavior.follow_rabbit, {
+toroco.set_inputs (behavior.collect_balls2, {
     camera = device.camera.get_value,
-    pose = device.pose.get_value
 })
 
-toroco.set_inputs (behavior.follow_mouse, {
+toroco.set_inputs (behavior.collect_balls1, {
     camera = device.camera.get_value,
-    pose = device.pose.get_value
 })
 
 
@@ -49,17 +46,12 @@ toroco.set_inputs (behavior.wander, {
     update = device.camera.get_value
 })
 
-toroco.set_inputs (behavior.avoid_collisions, {
-    camera = device.camera.get_value,
-    pose = device.pose.get_value
-})
 
 toroco.set_inputs (behavior.direction, {
     found_objective = {
-        behavior.follow_rabbit.found_objective,
-        behavior.follow_mouse.found_objective
-    },
-    found_object = behavior.avoid_collisions.found_object
+        behavior.collect_balls2.found_objective,
+        behavior.collect_balls1.found_objective
+    }
 })
 
 toroco.set_inputs (device.motors, {
@@ -70,61 +62,57 @@ toroco.set_inputs (device.motors, {
 })
 
 toroco.load_behavior_set (
-    behavior_set.follow_mouse,
+    behavior_set.collect_balls1,
     {
-        behavior.follow_mouse,
+        behavior.collect_balls1,
     }
 )
 
 toroco.load_behavior_set (
-    behavior_set.follow_rabbit,
+    behavior_set.collect_balls2,
     {
-        behavior.follow_rabbit,
+        behavior.collect_balls2,
     }
 )
 
 toroco.load_motivational_behavior (
-    motivational_behavior.follow_mouse,
-    'motivational_behaviors/follow_mouse',
-    behavior_set.follow_mouse,
+    motivational_behavior.collect_balls1,
+    'motivational_behaviors/collect_balls1',
+    behavior_set.collect_balls1,
     {
         impatience = {
             slow_rate = 1,
-            fast_rate = 2
+            fast_rate = 5
         },
         acquiescence = {
-            yield_time = 5,
-            give_up_time = 7
+            yield_time = 20,
+            give_up_time = 20
         }
     }
 )
 
 toroco.load_motivational_behavior (
-    motivational_behavior.follow_rabbit,
-    'motivational_behaviors/follow_rabbit',
-    behavior_set.follow_rabbit,
+    motivational_behavior.collect_balls2,
+    'motivational_behaviors/collect_balls2',
+    behavior_set.collect_balls2,
     {
         impatience = {
             slow_rate = 1,
-            fast_rate = 2
+            fast_rate = 5
         },
         acquiescence = {
-            yield_time = 5,
-            give_up_time = 7
+            yield_time = 20,
+            give_up_time = 20
         }
     }
 )
 
-toroco.set_inputs (motivational_behavior.follow_mouse, {
-    camera = device.camera.get_value
+toroco.set_inputs (motivational_behavior.collect_balls1, {
+    proximity = device.proximity.get_value
 })
 
-toroco.set_inputs (motivational_behavior.follow_rabbit, {
-    camera = device.camera.get_value
+toroco.set_inputs (motivational_behavior.collect_balls2, {
+    proximity = device.proximity.get_value
 })
-
 
 toroco.run()
-
-
-

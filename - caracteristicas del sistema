@@ -1,0 +1,75 @@
+- caracteristicas del sistema
+- protocolo de prueba para mostrar causa/efecto
+- "pruebas unitarias"
+- registros cuantitativos
+- 
+
+- avanzar informe
+- terminar cambio de behavior set
+- pensar bien el caso de test
+- pensar como demostrar que el caso test esta funcionando correctamente (
+ - comportamientos puntuales
+ - datos
+ - graficas
+ - etc
+)
+- Propuesta de plan
+
+
+Pruebas:
+
+Que tengo que demostrar funciona:
+
+- Diferentes grupos de behaviors (hebavior sets)
+- Cambio entre behaviors:
+	- Sensory feedback 
+	- impatience
+	- impatience reset
+	- aquiencence
+	- Motivacion mas grande cambia el behavior
+
+Pruebas a reliazar:
+
+Seria de utilidad graficar la motivacion de cada behavior en funcion del tiempo para ver como reaccionann a diferentes eventos.
+
+- La prueba mas simple seria tener un gato, un rato y un conejo, asi podemos ver como cambia de objetivo al pasar el tiempo. Esto tambien sirve para la aquiencence dado que es lo que hace que cambiamos de tarea si no pasa nada.
+
+Una forma de dar data de esto es midiendo la distancia a los objetivos en el tiempo. Se deberia ver como primeor se aserca a uno, y luego se acerca al otro. 
+
+- Para los sensory feedback se podria hacer que devuelvan 1 si ven al objetivo y 0 se caso contrario, entonces vamos a ver facil si persigue al correcto.
+
+- Para las cosas de comunicacion lo mas facil podria ser simular la comunicacion enviandole mensajes directo a un robot especifico.
+
+El impatience reset graficas la motivacion y deberiamos ver que apenas llega la primer anotificacion baja a 0, pero cuando lleganlas siguientes no.
+
+Para la aquiencence parecido, recibir mensajes deberia alterar la velocidad con la que crece la motivacion.
+
+
+
+Cronograma
+
+(Probablemente sea mejor pasarlo a febrero, pero igual planteo todo paradiciembre)
+
+7/10 - 21/10
+Implementacion casos de prueba y toma de datos
+Terminar primera seccion del informe (marco de trabajo)
+Arreglar bugs implementacion
+
+21/10 - 4/11
+Terminar con los casos de pruebas y toma de datos
+Parte del informe en la que se habla de los requisitos del sistema
+
+4-11 - 18/11
+Parte del informe en la que se habla de lo que se hizo en la implementacion
+
+18/11 - 3/12
+Parte del informe en la que hablo de los casos de prueba
+
+3/12 - 17/12
+Pulir informe, preparar defensa
+
+
+Mover el envio de mensajes para otro worker
+Definir timeout del coordinator
+Latex tiks para graficas/imagenes/etc
+gnuplot

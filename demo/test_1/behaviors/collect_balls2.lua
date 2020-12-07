@@ -6,12 +6,13 @@ local input = toroco.input
 
 -- /// Functions ///
 
-local findRabbit = function (raw_data)
+local findBalls = function (raw_data)
     if raw_data ~= nil then
         data = json.decode(raw_data)
         local visible_objects = data['visible_objects']
         for key, visible_object in ipairs(visible_objects) do
-            if visible_object['name'] ~= nil and visible_object['name'] == "RABBIT" then
+            local name = visible_object['name']
+            if name ~= nil and string.match(name, "Ball2") then
                 return true
             end
         end
@@ -20,9 +21,8 @@ local findRabbit = function (raw_data)
 end
 
 local camera_handler = function (event, camera_output)
-    -- print('following rabbit')
-    local found_left = findRabbit (camera_output[1])
-    local found_right = findRabbit (camera_output[2])
+    local found_left = findBalls (camera_output[1])
+    local found_right = findBalls (camera_output[2])
     toroco.set_output {found_objective = {found_left, found_right}}
 end
 

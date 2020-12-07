@@ -1,6 +1,6 @@
 robot_count = tonumber(os.getenv("ROBOT_COUNT"))
 robot_id = tonumber(os.getenv("ROBOT_ID"))
-starting_port = tonumber(os.getenv("STARTING_PORT"))
+starting_port = 5000 --tonumber(os.getenv("STARTING_PORT"))
 
 socket = require 'socket'
 json = require "json"

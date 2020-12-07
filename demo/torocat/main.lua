@@ -5,14 +5,14 @@ local toroco = require 'toroco.toroco'
 local device = toroco.device
 local behavior = toroco.behavior
 
-local converter = function (event_value)
+local basic_converter = function (event_value)
     return event_value
 end
 
-toroco.configure_polling (device.camera.get_value, 0.00001, converter)
-toroco.configure_polling (device.pose.get_value, 0.00001, converter)
-toroco.configure_polling (device.listener.send_updates, 0.1, converter)
-toroco.configure_polling (device.listener.recive_updates, 0.1, converter)
+toroco.configure_polling (device.camera.get_value, 0.00001, basic_converter)
+toroco.configure_polling (device.pose.get_value, 0.00001, basic_converter)
+toroco.configure_polling (device.listener.send_updates, 0.1, basic_converter)
+toroco.configure_polling (device.listener.recive_updates, 0.1, basic_converter)
 
 toroco.load_behavior (behavior.follow, 'behaviors/follow', {found_mouse = {false, false}})
 toroco.load_behavior (behavior.wander, 'behaviors/wander', {motors_values = {'0', '0'}})

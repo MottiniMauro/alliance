@@ -23,7 +23,7 @@ M.init = function(conf)
 	device.setvel2mtr=function(speed)
 		speed1 = speed[1]
 		speed2 = speed[2]
-		local command = 'id1 cat' .. robot_id .. '.motion' .. robot_id ..  ' set_speed [' .. speed1.. ', ' .. speed2 .."]\n"
+		local command = 'id1 collector' .. robot_id .. '.motion' .. robot_id ..  ' set_speed [' .. speed1.. ', ' .. speed2 .."]\n"
 	    commands_tcp:send(command);
 	end
 

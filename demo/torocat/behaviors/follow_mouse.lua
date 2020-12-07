@@ -20,7 +20,7 @@ local findMouse = function (raw_data)
 end
 
 local camera_handler = function (event, camera_output)
-    print('following mouse')
+    -- print('following mouse')
     local found_left = findMouse (camera_output[1])
     local found_right = findMouse (camera_output[2])
     toroco.set_output {found_objective = {found_left, found_right}}

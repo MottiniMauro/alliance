@@ -1,0 +1,41 @@
+Como correr el caso:
+
+
+multinode_server
+
+export MORSE_NODE=nodeA
+morse run builder.py 
+
+export MORSE_NODE=nodeB
+morse run builder.py  
+
+python3 script.py
+
+
+Puertos:
+
+60000 Proximity
+60001 alguno de colission
+60002 otro de colission
+60003 otro que se queda trancado
+60004 una camara (el del robot de atras, porque ve al otro)
+60005 otra camara
+60006 otro que se tranca
+60007 otra camara
+60008 otra camara
+60009 NADA
+
+
+
+60000 for component collector1.collision1.
+60001 for component collector1.motion1.
+60002 for component collector1.proximity.
+60003 for component collector1.semanticL1.
+60004 for component collector1.semanticR1.
+60005 for component collector2.collision2.
+60006 for component collector2.motion2.
+60007 for component collector2.semanticL2.
+60008 for component collector2.semanticR2.
+
+
+

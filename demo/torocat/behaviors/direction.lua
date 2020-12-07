@@ -27,12 +27,9 @@ local avoid_direction = function (left_data, right_data)
 end
 
 local objective_handler = function (event, objective_output)
-    print('=======object_hanlder========')
     if not avoiding and objective_output ~= nil then
         found_objective_left = objective_output[1]
         found_objective_right = objective_output[2]
-        print(found_objective_right)
-        print(found_objective_left)
         if found_objective_right or found_objective_left then
             objective_direction = caculate_direction (found_objective_left, found_objective_right)
             toroco.set_output {motors_setvel = objective_direction}

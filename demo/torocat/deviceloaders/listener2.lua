@@ -1,17 +1,18 @@
-robot_count = tonumber(os.getenv("ROBOT_COUNT"))
-robot_id = tonumber(os.getenv("ROBOT_ID"))
-starting_port = tonumber(os.getenv("STARTING_PORT"))
+local robot_count = tonumber(os.getenv("ROBOT_COUNT"))
+local robot_id = tonumber(os.getenv("ROBOT_ID"))
+local starting_port = tonumber(os.getenv("STARTING_PORT"))
 
-socket = require 'socket'
-json = require "json"
+local socket = require 'socket'
+local json = require "json"
 
-host = "127.0.0.1"
-socket = require("socket")
-robot_ports = {}
+local host = "127.0.0.1"
+local socket = require("socket")
+local robot_ports = {}
 
 udp = socket.udp()
 udp:setsockname("*", starting_port + robot_id)
-udp:settimeout(1)
+udp:settimeout(5)
+counter = 0 -- Remove later
 
 for i = 1, robot_count do
     if i ~= robot_id then
@@ -30,10 +31,11 @@ M.init = function(conf)
     device.module = 'listener'
     device.events = {}
 
-    device.send_updates = function(behavior_name)
+    device.send_updates = function(...)
+        counter = counter + 1
 		for i = 1, #robot_ports do
-            print('Sending: ' .. behavior_name)
-            udp:sendto(tostring(robot_id) .. ',' .. behavior_name, '127.0.0.1', robot_ports[i])
+            print('Sending: ' .. counter)
+            udp:sendto(counter, '127.0.0.1', robot_ports[i])
         end
     end
 
@@ -41,7 +43,6 @@ M.init = function(conf)
         message = udp:receive()
         if message then
             print('Received: ' .. message)
-            return message
         end
     end  
 
