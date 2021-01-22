@@ -1,15 +1,15 @@
-robot_count = tonumber(os.getenv("ROBOT_COUNT"))
-robot_id = tonumber(os.getenv("ROBOT_ID"))
-starting_port = 5000 --tonumber(os.getenv("STARTING_PORT"))
+local robot_count = tonumber(os.getenv("ROBOT_COUNT"))
+local robot_id = tonumber(os.getenv("ROBOT_ID"))
+local starting_port = 5000 --tonumber(os.getenv("STARTING_PORT"))
 
-socket = require 'socket'
-json = require "json"
+local socket = require 'socket'
+local json = require "json"
 
-host = "127.0.0.1"
-socket = require("socket")
-robot_ports = {}
+local host = "127.0.0.1"
+local socket = require("socket")
+local robot_ports = {}
 
-udp = socket.udp()
+local udp = socket.udp()
 udp:setsockname("*", starting_port + robot_id)
 udp:settimeout(1)
 
@@ -32,7 +32,7 @@ M.init = function(conf)
 
     device.send_updates = function(behavior_name)
 		for i = 1, #robot_ports do
-            print('Sending: ' .. behavior_name)
+            -- print('Sending: ' .. tostring(robot_id) .. ',' .. behavior_name .. " to " .. tostring(robot_ports[i]))
             udp:sendto(tostring(robot_id) .. ',' .. behavior_name, '127.0.0.1', robot_ports[i])
         end
     end
@@ -40,7 +40,7 @@ M.init = function(conf)
     device.recive_updates = function(...)
         message = udp:receive()
         if message then
-            print('Received: ' .. message)
+            -- print('Received: ' .. message)
             return message
         end
     end  

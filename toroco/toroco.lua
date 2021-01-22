@@ -62,6 +62,7 @@ M.motivational_behaviors = {}
 
 M.robot_behaviors = {}
 M.behavior_robots = {}
+M.retry_behaviors = {}
 M.active_behavior = nil
 
 -- /// behavior_taskd ///
@@ -124,6 +125,10 @@ local notifier_function = nil
 
 M.params = {}
 
+M.motivation_threshold = 100
+
+M.iteration_timeout = 1
+
 local meta1
 meta1 = {
 	__index = function (table, key)
@@ -138,6 +143,7 @@ meta1 = {
 }
 setmetatable(M.params, meta1)
 
+local start_time = 0
 
 -- *****************
 -- *** Functions ***
@@ -217,6 +223,15 @@ local dispatch_signal = function (event, filter_receiver, ...)
            	end
         end 
     end
+end
+
+local has_value = function(tab, val)
+    for index, value in ipairs(tab) do
+        if value == val then
+            return true
+        end
+    end
+    return false
 end
 
 -- Torocó version of sched.wait_for_device().
@@ -838,6 +853,10 @@ M.set_inputs = function (receiver_desc, inputs)
         local release_tasks = {}
         if receiver_desc.type == 'behavior' or receiver_desc.type == 'motivational_behavior' then
             local beh = M.wait_for_receiver (receiver_desc)
+            while beh == nil do
+                print("Could not find " .. receiver_desc.type .. " " .. receiver_desc.emitter .. ", retrying")
+                beh = M.wait_for_receiver (receiver_desc)
+            end
 
             for _, receiver in ipairs (beh.receivers) do
                 
@@ -1378,9 +1397,16 @@ M.set_motivational_sensory_feedback = function(value)
 end
 
 M.calculate_motivation = function(motivational_behavior)
+    if M.active_behavior ~= nil and M.active_behavior.behavior ~= motivational_behavior.name then
+        return 0
+    end
     local motivation = motivational_behavior.motivation + M.behavior_impatience(motivational_behavior.name)
     motivation = motivation * motivational_behavior.sensory_feedback
     motivation = motivation * M.behavior_acquiescence(motivational_behavior.name)
+    motivation = motivation * M.behavior_category(motivational_behavior.name)
+    if motivation > M.motivation_threshold then
+        return M.motivation_threshold
+    end
     return motivation
 end
 
@@ -1388,41 +1414,81 @@ M.change_behavior_set = function(new_behavior_set)
     if M.active_behavior ~= nil then
         M.suspend_behavior_set(M.active_behavior.behavior)
     end
-    M.resume_behavior_set(new_behavior_set)
-    M.active_behavior = {
-       behavior = new_behavior_set,
-       time = os.time()
-    }
+    if new_behavior_set ~= nil then
+        print((os.time() - start_time).. ', ' .. new_behavior_set)
+        M.resume_behavior_set(new_behavior_set)
+        M.active_behavior = {
+           behavior = new_behavior_set,
+           time = os.time()
+        }
+        table.insert(M.retry_behaviors, new_behavior_set)
+    else
+        M.active_behavior = nil
+    end
+    if table.getn(M.retry_behaviors) == M.uncompleted_behavior_sets_count() then
+        M.retry_behaviors = {}
+    end
+end
+
+M.uncompleted_behavior_sets_count = function()
+    count = 0
+    for _, behavior in pairs(M.motivational_behaviors) do
+        count = count + behavior.sensory_feedback
+    end
+    return count
 end
 
 M.start_coordinator = function()
     local new_behavior = nil
     local max_motivation = 0
     local current_motivation = 0
+    local output = ''
+    -- output = output .. tostring(os.time() - start_time)
     for _, behavior in pairs(M.motivational_behaviors) do
         current_motivation = M.calculate_motivation(behavior)
+        if output ~= '' then
+            output = output .. ', '
+        end
+        output = output .. current_motivation
+        -- print("Behavior " .. behavior.name .. ": " .. current_motivation)
         behavior.motivation = current_motivation
-        if current_motivation > max_motivation then
-            max_motivation = current_motivation
-            new_behavior = behavior
+        if current_motivation >= M.motivation_threshold then
+            if max_motivation == 0 or current_motivation > max_motivation then
+                max_motivation = current_motivation
+                new_behavior = behavior
+            end
         end
     end
+    print(output)
     if new_behavior ~= nil then
         if M.active_behavior == nil or M.active_behavior.behavior ~= new_behavior.name then
             M.change_behavior_set(new_behavior.name)
         end
         M.notifier_function(new_behavior.name)
+    else
+        M.change_behavior_set(nil)
     end
 end
 
-M.robot_message = function(robot_id, behavior_desc)
-    if M.robot_behaviors[robot_id] == nil then
+M.message_received = function(robot_id, behavior_desc)
+    -- print('message_received ' .. robot_id .. behavior_desc)
+    behavior_list = {behavior_desc}
+    if M.robot_behaviors[robot_id] ~= nil then
+        if not has_value(M.robot_behaviors[robot_id].behavior_list, behavior_desc) then
+            behavior_list = M.robot_behaviors[robot_id].behavior_list
+            table.insert(behavior_list, behavior_desc)
+            motivational_behavior = M.motivational_behaviors[behavior_desc]
+            motivational_behavior.motivation = 0
+        end
+    else
+        behavior_list = {behavior_desc}
         motivational_behavior = M.motivational_behaviors[behavior_desc]
         motivational_behavior.motivation = 0
     end
     M.robot_behaviors[robot_id] = {
         behavior = behavior_desc,
-        time = os.time()
+        time = os.time(),
+        behavior_list = behavior_list
     }
 end
 
@@ -1433,7 +1499,7 @@ M.behavior_impatience = function(motivational_behavior_desc)
         current_time = os.time()
         for _, robot in pairs(M.robot_behaviors) do
             time_past = current_time - robot.time
-            if robot.behavior == motivational_behavior_desc and time_past < 10 then
+            if robot.behavior == motivational_behavior_desc and time_past < impatience.affect_time then
                 return impatience.slow_rate
             end
         end 
@@ -1450,10 +1516,12 @@ M.behavior_acquiescence = function(motivational_behavior_desc)
     motivational_behavior =  M.motivational_behaviors[motivational_behavior_desc]
     acquiescence = motivational_behavior.acquiescence
     if behavior_time > acquiescence.give_up_time  then
+        print((os.time() - start_time) .. ' Giving up on ' .. motivational_behavior_desc)
         return 0
     elseif behavior_time > acquiescence.yield_time and next(M.robot_behaviors) ~= nil then
         for _, robot in pairs(M.robot_behaviors) do
             if robot.behavior == motivational_behavior_desc then
+                print((os.time() - start_time).. ' Yielding ' .. motivational_behavior_desc)
                 return 0
             end
         end
@@ -1461,8 +1529,26 @@ M.behavior_acquiescence = function(motivational_behavior_desc)
     return 1
 end
 
+M.behavior_category = function(motivational_behavior_desc)
+    if  M.active_behavior ~= nil and M.active_behavior.behavior == motivational_behavior_desc then
+        return 1
+    elseif M.active_behavior == nil and has_value(M.retry_behaviors, motivational_behavior_desc) then
+        return 0
+    else
+        return 1
+    end
+end
+
 M.configure_notifier = function(notifier_function)
     M.notifier_function = notifier_function
+end
+
+M.set_motivation_threshold = function(threshold)
+    M.motivation_threshold = threshold
+end
+
+M.set_iteration_timeout = function(timeout)
+    M.iteration_timeout = timeout
 end
 
 ---- Torocó main function. ///
@@ -1477,8 +1563,9 @@ M.run = function(toribio_conf_file)
     end
 
     print ('Torocó go!')
+    start_time = os.time()
     sched.run(M.start_coordinator)
-    sched.sigrun ({ {}, timeout = 1 }, M.start_coordinator)
+    sched.sigrun ({ {}, timeout = M.iteration_timeout }, M.start_coordinator)
 
     sched.loop()
 end

@@ -3,7 +3,7 @@ local robot_id = tonumber(os.getenv("ROBOT_ID"))
 local socket = require 'socket'
 local json = require "json"
 
-local host, left_cam_port, right_cam_port = "localhost", 60003 + (4 * (robot_id - 1)), 60004 + (4 * (robot_id - 1))
+local host, left_cam_port, right_cam_port = "localhost", 60002 + (4 * (robot_id - 1)), 60003 + (4 * (robot_id - 1))
 local socket = require("socket")
 
 local left_cam_tcp = assert(socket.tcp())
@@ -28,6 +28,7 @@ M.init = function(conf)
     device.get_value = function(...)
 		local left_message, err = left_cam_tcp:receive()
 		local right_message, err = right_cam_tcp:receive()
+        -- print(left_message)
 
 	    return {left_message, right_message}
     end

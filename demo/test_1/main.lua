@@ -1,6 +1,3 @@
--- /// Torocó example - Line follower ///
--- main.lua
-
 local toroco = require 'toroco.toroco'
 local device = toroco.device
 local behavior = toroco.behavior
@@ -13,16 +10,17 @@ end
 
 local recive_converter = function (event_value)
     if event_value ~= nil then
+        -- print("Message: " .. event_value)
         message = event_value:gmatch("([^,]+),?")
         robot_id = message()
         behavior = message()
-        toroco.robot_message(robot_id, behavior)
+        toroco.message_received(robot_id, behavior)
     end
     return event_value
 end
 
-toroco.configure_polling (device.camera.get_value, 0.00001, basic_converter)
-toroco.configure_polling (device.proximity.get_value, 0.00001, basic_converter)
+toroco.configure_polling (device.camera.get_value, 0.001, basic_converter)
+toroco.configure_polling (device.proximity.get_value, 0.01, basic_converter)
 toroco.configure_polling (device.listener.recive_updates, 0.1, recive_converter)
 
 toroco.configure_notifier (device.listener.send_updates)
@@ -41,11 +39,9 @@ toroco.set_inputs (behavior.collect_balls1, {
     camera = device.camera.get_value,
 })
 
-
 toroco.set_inputs (behavior.wander, {
     update = device.camera.get_value
 })
-
 
 toroco.set_inputs (behavior.direction, {
     found_objective = {
@@ -82,11 +78,12 @@ toroco.load_motivational_behavior (
     {
         impatience = {
             slow_rate = 1,
-            fast_rate = 5
+            fast_rate = 3,
+            affect_time = 100
         },
         acquiescence = {
             yield_time = 20,
-            give_up_time = 20
+            give_up_time = 40
         }
     }
 )
@@ -98,11 +95,12 @@ toroco.load_motivational_behavior (
     {
         impatience = {
             slow_rate = 1,
-            fast_rate = 5
+            fast_rate = 2,
+            affect_time = 100
         },
         acquiescence = {
             yield_time = 20,
-            give_up_time = 20
+            give_up_time = 40
         }
     }
 )
@@ -115,4 +113,10 @@ toroco.set_inputs (motivational_behavior.collect_balls2, {
     proximity = device.proximity.get_value
 })
 
+toroco.set_motivation_threshold(20)
+toroco.set_iteration_timeout(1)
 toroco.run()
+
+
+
+

@@ -1,11 +1,14 @@
+local robot_id = tonumber(os.getenv("ROBOT_ID"))
+
 local socket = require 'socket'
 
-local host, port = "localhost", 60002
-local  socket = require("socket")
+local host, port = "localhost", 60001 + (4 * (robot_id - 1))
+local socket = require("socket")
 
-local  tcp = assert(socket.tcp())
+local tcp = assert(socket.tcp())
 
 tcp:connect(host, port);
+tcp:settimeout(0.5)
 
 print('Proximity port: ' .. port)
 

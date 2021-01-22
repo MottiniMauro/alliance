@@ -5,11 +5,11 @@ local input = toroco.input
 
 local caculate_direction = function (left_data, right_data)
     if left_data and right_data then
-        return {'2', '0'}
+        return {'0.5', '0'}
     elseif left_data then
-        return {'1.5', '1'}
+        return {'0.25', '0.5'}
     elseif right_data then
-        return {'1.5', '-1'}
+        return {'0.25', '-0.5'}
     end
 end
 

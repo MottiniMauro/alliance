@@ -12,7 +12,8 @@ local findBalls = function (raw_data)
         local visible_objects = data['visible_objects']
         for key, visible_object in ipairs(visible_objects) do
             local name = visible_object['name']
-            if name ~= nil and string.match(name, "Ball2") then
+            local height = visible_object['position'][3]
+            if name ~= nil and string.match(name, "Ball2") and height > 0.249 then
                 return true
             end
         end

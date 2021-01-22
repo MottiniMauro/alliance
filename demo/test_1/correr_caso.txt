@@ -11,6 +11,10 @@ morse run builder.py
 
 python3 script.py
 
+export ROBOT_COUNT=2
+export ROBOT_ID=2
+lua5.1 main.lua
+
 
 Puertos:
 
