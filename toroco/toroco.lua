@@ -1082,30 +1082,31 @@ end
 -- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior)
 
 M.suspend_behavior = function (behavior_desc)
-    local tasks = M.behaviors [behavior_desc.emitter].tasks
+    print('suspend_behavior ' .. behavior_desc.emitter)
+    local beh = M.behaviors [behavior_desc.emitter]
 
-    for i = #tasks, 1, -1 do
+    for event_name, event in pairs(beh.events) do
+        
+        if M.active_events [event] then
+            -- set the event as inactive
+            M.active_events [event] = nil
+                
+            -- release the inhibitions for the event
+            for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
 
-        local beh = M.behavior_taskd [tasks[i]]
+                release_inhibition (beh, inhibition_target)
+            end
 
-        for event_name, event in pairs(beh.events) do
-            
-            if M.active_events [event] then
-                -- set the event as inactive
-                M.active_events [event] = nil
-                    
-                -- release the inhibitions for the event
-                for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
-
-                    release_inhibition (beh, inhibition_target)
-                end
-
-                -- release the suppressions for the event
-                for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
-                    release_suppression (beh, suppression_target.event, suppression_target.receiver)
-                end
+            -- release the suppressions for the event
+            for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
+                release_suppression (beh, suppression_target.event, suppression_target.receiver)
             end
         end
+    end
+    
+    local tasks = beh.tasks
+
+    for i = #tasks, 1, -1 do
 
         if tasks [i].status ~= 'dead' then
             sched.set_pause (tasks [i], true)
@@ -1297,7 +1298,7 @@ end
 
 M.load_behavior_set = function (behavior_set_desc, behaviors)
     local load_behavior_set = function()
-        if M.behavior_sets [behavior_set_desc.emitter] then
+        if M.behavior_sets[behavior_set_desc.emitter] then
             error ('Torocó error: Duplicated behavior set \'' .. behavior_set_desc.emitter.. '\' at load_behavior_set().')
         end
 
@@ -1311,8 +1312,9 @@ M.load_behavior_set = function (behavior_set_desc, behaviors)
 end
 
 M.suspend_behavior_set = function (behavior_set_desc)
+    print('suspend_behavior_set ' .. behavior_set_desc)
     local suspend_behavior_set = function()
-        for _, behavior in ipairs(M.behavior_sets [behavior_set_desc].behaviors) do
+        for _, behavior in ipairs(M.behavior_sets[behavior_set_desc].behaviors) do
             M.suspend_behavior(behavior)
         end
     end
@@ -1321,7 +1323,7 @@ end
 
 M.resume_behavior_set = function (behavior_set_desc)
     local resume_behavior_set = function()
-        for _, behavior in ipairs(M.behavior_sets [behavior_set_desc].behaviors) do
+        for _, behavior in ipairs(M.behavior_sets[behavior_set_desc].behaviors) do
             M.resume_behavior(behavior)
         end
     end
@@ -1473,21 +1475,31 @@ end
 M.message_received = function(robot_id, behavior_desc)
     -- print('message_received ' .. robot_id .. behavior_desc)
     behavior_list = {behavior_desc}
+    time = os.time()
     if M.robot_behaviors[robot_id] ~= nil then
         if not has_value(M.robot_behaviors[robot_id].behavior_list, behavior_desc) then
             behavior_list = M.robot_behaviors[robot_id].behavior_list
             table.insert(behavior_list, behavior_desc)
             motivational_behavior = M.motivational_behaviors[behavior_desc]
             motivational_behavior.motivation = 0
+            if M.active_behavior ~= nil and M.active_behavior.behavior == behavior_desc then
+                print('message_received')
+                M.change_behavior_set(nil)
+            end
+        else
+            time = M.robot_behaviors[robot_id].time
         end
     else
-        behavior_list = {behavior_desc}
         motivational_behavior = M.motivational_behaviors[behavior_desc]
         motivational_behavior.motivation = 0
+        if M.active_behavior ~= nil and M.active_behavior.behavior == behavior_desc then
+            print('message_received')
+            M.change_behavior_set(nil)
+        end
     end
     M.robot_behaviors[robot_id] = {
         behavior = behavior_desc,
-        time = os.time(),
+        time = time,
         behavior_list = behavior_list
     }
 end
