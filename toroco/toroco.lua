@@ -412,7 +412,7 @@ end
 -- @param event_desc event descriptor (return value of /toroco/device or /toroco/behavior)
 
 local release_inhibition = function (behavior, event_desc)
-
+    print('release_inhibition ' .. event_desc)
     local event = get_real_event (event_desc)
 
     if not event then
@@ -475,7 +475,7 @@ end
 -- @param receiver_desc Receiver descriptor (return value of /toroco/behavior)
 
 local release_suppression = function (behavior, event_desc, receiver_desc)
-
+     print('release_inhibition')
     local event = get_real_event (event_desc)
 
     if not event then
@@ -1083,30 +1083,31 @@ end
 
 M.suspend_behavior = function (behavior_desc)
     print('suspend_behavior ' .. behavior_desc.emitter)
-    local beh = M.behaviors [behavior_desc.emitter]
-
-    for event_name, event in pairs(beh.events) do
-        
-        if M.active_events [event] then
-            -- set the event as inactive
-            M.active_events [event] = nil
-                
-            -- release the inhibitions for the event
-            for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
-
-                release_inhibition (beh, inhibition_target)
-            end
-
-            -- release the suppressions for the event
-            for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
-                release_suppression (beh, suppression_target.event, suppression_target.receiver)
-            end
-        end
-    end
     
-    local tasks = beh.tasks
+    local tasks = M.behaviors [behavior_desc.emitter].tasks
 
     for i = #tasks, 1, -1 do
+
+        local beh = M.behavior_taskd [tasks[i]]
+
+        for event_name, event in pairs(beh.events) do
+            print(event_name)
+            if M.active_events [event] then
+                -- set the event as inactive
+                M.active_events [event] = nil
+                    
+                -- release the inhibitions for the event
+                for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
+
+                    release_inhibition (beh, inhibition_target)
+                end
+
+                -- release the suppressions for the event
+                for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
+                    release_suppression (beh, suppression_target.event, suppression_target.receiver)
+                end
+            end
+        end
 
         if tasks [i].status ~= 'dead' then
             sched.set_pause (tasks [i], true)

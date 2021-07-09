@@ -88,8 +88,8 @@ toroco.load_motivational_behavior (
             affect_time = 100
         },
         acquiescence = {
-            yield_time = 500,
-            give_up_time = 600
+            yield_time = 20,
+            give_up_time = 30
         }
     }
 )
@@ -105,8 +105,8 @@ toroco.load_motivational_behavior (
             affect_time = 100
         },
         acquiescence = {
-            yield_time = 500,
-            give_up_time = 600
+            yield_time = 20,
+            give_up_time = 30
         }
     }
 )
@@ -119,7 +119,7 @@ toroco.set_inputs (motivational_behavior.collect_balls2, {
     proximity = device.proximity.get_value
 })
 
-toroco.set_motivation_threshold(30)
+toroco.set_motivation_threshold(20)
 toroco.run()
 
 
