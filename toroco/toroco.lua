@@ -29,6 +29,7 @@ M.output = require 'toroco.output'
 M.device = require 'toroco.device'
 M.behavior = require 'toroco.behavior'
 M.behavior_set = require 'toroco.behavior_set'
+M.motivational_behavior = require 'toroco.motivational_behavior'
 
 require 'lumen.tasks.selector'.init({service='nixio'})
 
@@ -54,6 +55,15 @@ M.behaviors = {}
 -- /// behavior_sets ///
 
 M.behavior_sets = {}
+
+-- /// motivational_behaviors ///
+
+M.motivational_behaviors = {}
+
+M.robot_behaviors = {}
+M.behavior_robots = {}
+M.retry_behaviors = {}
+M.active_behavior = nil
 
 -- /// behavior_taskd ///
 -- Behavior of each coroutine.
@@ -105,6 +115,8 @@ local inhibited_events = {}
 
 M.devices = {}
 
+local notifier_function = nil
+
 
 -- /// M.params ///
 -- Paramaters of each behavior.
@@ -112,6 +124,10 @@ M.devices = {}
 -- Example: toroco.params.max_value.
 
 M.params = {}
+
+M.motivation_threshold = 100
+
+M.iteration_timeout = 1
 
 local meta1
 meta1 = {
@@ -127,6 +143,7 @@ meta1 = {
 }
 setmetatable(M.params, meta1)
 
+local start_time = 0
 
 -- *****************
 -- *** Functions ***
@@ -206,6 +223,15 @@ local dispatch_signal = function (event, filter_receiver, ...)
            	end
         end 
     end
+end
+
+local has_value = function(tab, val)
+    for index, value in ipairs(tab) do
+        if value == val then
+            return true
+        end
+    end
+    return false
 end
 
 -- Torocó version of sched.wait_for_device().
@@ -323,9 +349,9 @@ local get_real_event = function (event_desc)
         return device.events[event_desc.name]
 
 	-- if the event is defined in a behavior, ...
-    elseif event_desc.type == 'behavior' then 
+    elseif event_desc.type == 'behavior' or event_desc.type == 'motivational_behavior' then 
 
-        local behavior = M.wait_for_behavior (event_desc.emitter)
+        local behavior = M.wait_for_receiver (event_desc)
        
         if not behavior.events[event_desc.name] then
         
@@ -386,7 +412,7 @@ end
 -- @param event_desc event descriptor (return value of /toroco/device or /toroco/behavior)
 
 local release_inhibition = function (behavior, event_desc)
-
+    print('release_inhibition ' .. event_desc)
     local event = get_real_event (event_desc)
 
     if not event then
@@ -449,7 +475,7 @@ end
 -- @param receiver_desc Receiver descriptor (return value of /toroco/behavior)
 
 local release_suppression = function (behavior, event_desc, receiver_desc)
-
+     print('release_inhibition')
     local event = get_real_event (event_desc)
 
     if not event then
@@ -759,49 +785,24 @@ M.unset_output = function ()
     end
 end
 
--- M.unset_outputs = function (behavior_desc)
---     local behavior = M.behaviors[behavior_desc]
---     local tasks = M.behaviors[behavior_desc].tasks
-
---     for i = #tasks, 1, -1 do
---         local beh = tasks[i]
-
---         for event_name, event in pairs(beh.events) do
-            
---             if M.active_events [event] then
---                 -- set the event as inactive
---                 M.active_events [event] = nil
-                    
---                 -- release the inhibitions for the event
---                 for _, inhibition_target in ipairs (beh.inhibition_targets [event_name] or {}) do
-
---                     release_inhibition (M.behavior_taskd [sched.running_task], inhibition_target)
---                 end
-
---                 -- release the suppressions for the event
---                 for _, suppression_target in ipairs (beh.suppression_targets [event_name] or {}) do
---                     release_suppression (M.behavior_taskd [sched.running_task], suppression_target.event, suppression_target.receiver)
---                 end
---             end
---         end
---     end
--- end
-
-
-
 -- add coroutine to a behavior
 -- behavior_desc: behavior descriptor (return value of /toroco/behavior)
 -- coroutine: function to be executed.
 
-local add_coroutine = function (behavior_name, coroutine) 
-
+local add_coroutine = function (receiver_desc, coroutine) 
+    local receiver_name = receiver_desc.emitter
     local taskd = sched.new_task(coroutine)
+    local receiver_set = {}
+    if receiver_desc.type == 'behavior' then
+        receiver_set = M.behaviors
+    elseif receiver_desc.type == 'motivational_behavior' then
+        receiver_set = M.motivational_behaviors
+    end
 
-    M.wait_for_behavior(behavior_name)
+    M.wait_for_receiver(receiver_desc)
+    M.behavior_taskd [taskd] = receiver_set[receiver_name]
 
-    M.behavior_taskd [taskd] = M.behaviors[behavior_name]
-
-    table.insert (M.behaviors[behavior_name].tasks, taskd)
+    table.insert (receiver_set[receiver_name].tasks, taskd)
 
     sched.set_pause(taskd, true)
 end
@@ -850,9 +851,12 @@ M.set_inputs = function (receiver_desc, inputs)
 
     local set_inputs_task = function ()
         local release_tasks = {}
-
-        if receiver_desc.type == 'behavior' then
-            local beh = M.wait_for_behavior (receiver_desc.emitter)
+        if receiver_desc.type == 'behavior' or receiver_desc.type == 'motivational_behavior' then
+            local beh = M.wait_for_receiver (receiver_desc)
+            while beh == nil do
+                print("Could not find " .. receiver_desc.type .. " " .. receiver_desc.emitter .. ", retrying")
+                beh = M.wait_for_receiver (receiver_desc)
+            end
 
             for _, receiver in ipairs (beh.receivers) do
                 
@@ -915,9 +919,9 @@ M.set_inputs = function (receiver_desc, inputs)
             end
         end
 
-        if receiver_desc.type == 'behavior' then
+        if receiver_desc.type == 'behavior' or receiver_desc.type == 'motivational_behavior' then
 
-            local beh = M.wait_for_behavior (receiver_desc.emitter)
+            local beh = M.wait_for_receiver (receiver_desc)
             
             beh.input_sources = inputs
             beh.release_tasks = release_tasks
@@ -979,9 +983,9 @@ M.set_inputs = function (receiver_desc, inputs)
                     register_dispatcher (event)
                 end
                 
-                if input_source.type == 'behavior' then
+                if input_source.type == 'behavior' or input_source.type == 'motivational_behavior' then
                     -- add the suppression targets to beh
-                    local beh = M.wait_for_behavior (input_source.emitter)
+                    local beh = M.wait_for_receiver (input_source)
                     beh.suppression_targets [input_source.name] =
                         beh.suppression_targets [input_source.name] or {}
 
@@ -1030,7 +1034,7 @@ M.set_inhibitors = function (emitter_desc, outputs_inhibitors)
 
                 if inhibitor_event_desc.type == 'behavior' then
 
-                    local beh = M.wait_for_behavior (inhibitor_event_desc.emitter)
+                    local beh = M.wait_for_receiver (inhibitor_event_desc)
                     beh.inhibition_targets [inhibitor_event_desc.name] =
                         beh.inhibition_targets [inhibitor_event_desc.name] or {}
 
@@ -1063,11 +1067,11 @@ M.trigger = function (input_desc, handler)
 
         local receiver = register_handler (behavior.name, input_desc.name, behavior.input_sources[input_desc.name], handler)
 
-        table.insert (M.behaviors[behavior.name].receivers, receiver)
+        table.insert (behavior.receivers, receiver)
             
-        M.behavior_taskd [receiver.taskd] = M.behaviors[behavior.name]
+        M.behavior_taskd [receiver.taskd] = behavior
 
-        table.insert (M.behaviors[behavior.name].tasks, receiver.taskd)
+        table.insert (behavior.tasks, receiver.taskd)
     end    
 
     return coroutine 
@@ -1078,6 +1082,8 @@ end
 -- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior)
 
 M.suspend_behavior = function (behavior_desc)
+    print('suspend_behavior ' .. behavior_desc.emitter)
+    
     local tasks = M.behaviors [behavior_desc.emitter].tasks
 
     for i = #tasks, 1, -1 do
@@ -1085,7 +1091,7 @@ M.suspend_behavior = function (behavior_desc)
         local beh = M.behavior_taskd [tasks[i]]
 
         for event_name, event in pairs(beh.events) do
-            
+            print(event_name)
             if M.active_events [event] then
                 -- set the event as inactive
                 M.active_events [event] = nil
@@ -1165,13 +1171,21 @@ end
 -- suspend a task until the behavior has been registered to Torocó.
 local waitd = {M.events.new_behavior}
 
-M.wait_for_behavior = function(behavior_name, timeout)
+M.wait_for_receiver = function(receiver_desc)
+    local timeout = 3
     assert(sched.running_task, 'Must run in a task')
 
-    -- if the behavior is already loaded, return success.
+    local receiver_set = {}
+    local receiver_name = receiver_desc.emitter
+    if receiver_desc.type == 'behavior' then
+        receiver_set = M.behaviors
+    elseif receiver_desc.type == 'motivational_behavior' then
+        receiver_set = M.motivational_behaviors
+    end
 
-    if M.behaviors[behavior_name] and M.behaviors[behavior_name].loaded then
-        return M.behaviors[behavior_name]
+    -- if the receiver is already loaded, return success.
+    if receiver_set[receiver_name] and receiver_set[receiver_name].loaded then
+        return receiver_set[receiver_name]
     end
 
     -- else, ...
@@ -1186,15 +1200,14 @@ M.wait_for_behavior = function(behavior_name, timeout)
     end
 
     while true do
-
         -- wait for the event 'new_behavior'
-	    local ev, new_behavior_name = sched.wait(waitd) 
+	    local ev, new_receiver_name = sched.wait(waitd) 
         -- process the result.
 	    if not ev then --timeout
 		    return nil, 'timeout'
 
-	    elseif new_behavior_name == behavior_name then
-		    return M.behaviors[behavior_name] 
+	    elseif new_receiver_name == receiver_name then
+		    return receiver_set[receiver_name] 
 
 	    elseif wait_until then 
             waitd.timeout=wait_until-sched.get_time() 
@@ -1259,7 +1272,7 @@ M.add_behavior = function (behavior_desc, coroutines, params)
         sched.signal (M.events.new_behavior, behavior_desc.emitter)
         
         for _, coroutine in ipairs (coroutines) do
-            add_coroutine (behavior_desc.emitter, coroutine)
+            add_coroutine (behavior_desc, coroutine)
         end
     
         local init_behavior = function()
@@ -1286,7 +1299,7 @@ end
 
 M.load_behavior_set = function (behavior_set_desc, behaviors)
     local load_behavior_set = function()
-        if M.behavior_sets [behavior_set_desc.emitter] then
+        if M.behavior_sets[behavior_set_desc.emitter] then
             error ('Torocó error: Duplicated behavior set \'' .. behavior_set_desc.emitter.. '\' at load_behavior_set().')
         end
 
@@ -1300,8 +1313,9 @@ M.load_behavior_set = function (behavior_set_desc, behaviors)
 end
 
 M.suspend_behavior_set = function (behavior_set_desc)
+    print('suspend_behavior_set ' .. behavior_set_desc)
     local suspend_behavior_set = function()
-        for _, behavior in ipairs(M.behavior_sets [behavior_set_desc].behaviors) do
+        for _, behavior in ipairs(M.behavior_sets[behavior_set_desc].behaviors) do
             M.suspend_behavior(behavior)
         end
     end
@@ -1310,11 +1324,244 @@ end
 
 M.resume_behavior_set = function (behavior_set_desc)
     local resume_behavior_set = function()
-        for _, behavior in ipairs(M.behavior_sets [behavior_set_desc].behaviors) do
+        for _, behavior in ipairs(M.behavior_sets[behavior_set_desc].behaviors) do
             M.resume_behavior(behavior)
         end
     end
     sched.new_task(resume_behavior_set)
+end
+
+M.load_motivational_behavior = function (motivational_behavior_desc, pathname, behavior_set, params)
+    local motivational_behavior_file = loadfile (pathname..'.lua')
+    if not motivational_behavior_file then
+        error ('Torocó error: motivational behavior file \'' .. pathname.. '.lua\' not found.')
+    end
+    -- execute file and get coroutines
+    coroutines = {motivational_behavior_file()}
+    
+    -- add behavior to Torocó
+    M.add_motivational_behavior (motivational_behavior_desc, coroutines, behavior_set, params)
+end
+
+
+M.add_motivational_behavior = function (motivational_behavior_desc, coroutines, behavior_set, params)
+    local load_motivational_behavior = function()
+
+        if M.motivational_behaviors [motivational_behavior_desc.emitter] then
+            error ('Torocó error: Duplicated motivational behavior \'' .. motivational_behavior_desc.emitter.. '\' at load_motivational_behavior().')
+        end
+
+        -- add behavior_set to 'M.motivational_behaviors'
+        M.motivational_behaviors [motivational_behavior_desc.emitter] = {
+            name = motivational_behavior_desc.emitter,
+            behavior_set = behavior_set,
+            events = {},
+            event_count = 0,
+            inhibition_targets = {},
+            suppression_targets = {},
+            input_sources = {},
+            release_tasks = {},
+            receivers = {},
+            tasks = {},
+            params = params or {},
+            sensory_feedback = 0,
+            motivation = 1,
+            impatience = params['impatience'],
+            acquiescence = params['acquiescence']
+        }
+
+        -- emits new_behavior.
+        M.motivational_behaviors [motivational_behavior_desc.emitter].loaded = true
+        sched.signal (M.events.new_behavior, motivational_behavior_desc.emitter)
+        
+        for _, coroutine in ipairs (coroutines) do
+            add_coroutine (motivational_behavior_desc, coroutine)
+        end
+    
+        local init_motivational_behavior = function()
+            local run_tasks = {}
+            for _, task in ipairs (M.motivational_behaviors [motivational_behavior_desc.emitter].tasks) do
+                sched.set_pause (task, false)
+                table.insert (run_tasks, task)
+            end
+
+            M.suspend_behavior_set(motivational_behavior_desc.emitter)
+        end
+
+        sched.new_task(init_motivational_behavior)
+    end
+
+    sched.new_task(load_motivational_behavior)
+end
+
+M.set_motivational_sensory_feedback = function(value)
+    local beh = M.behavior_taskd [sched.running_task]
+    beh.sensory_feedback = value
+end
+
+M.calculate_motivation = function(motivational_behavior)
+    if M.active_behavior ~= nil and M.active_behavior.behavior ~= motivational_behavior.name then
+        return 0
+    end
+    local motivation = motivational_behavior.motivation + M.behavior_impatience(motivational_behavior.name)
+    motivation = motivation * motivational_behavior.sensory_feedback
+    motivation = motivation * M.behavior_acquiescence(motivational_behavior.name)
+    motivation = motivation * M.behavior_category(motivational_behavior.name)
+    if motivation > M.motivation_threshold then
+        return M.motivation_threshold
+    end
+    return motivation
+end
+
+M.change_behavior_set = function(new_behavior_set)
+    if M.active_behavior ~= nil then
+        M.suspend_behavior_set(M.active_behavior.behavior)
+    end
+    if new_behavior_set ~= nil then
+        print((os.time() - start_time).. ', ' .. new_behavior_set)
+        M.resume_behavior_set(new_behavior_set)
+        M.active_behavior = {
+           behavior = new_behavior_set,
+           time = os.time()
+        }
+        table.insert(M.retry_behaviors, new_behavior_set)
+    else
+        M.active_behavior = nil
+    end
+    if table.getn(M.retry_behaviors) == M.uncompleted_behavior_sets_count() then
+        M.retry_behaviors = {}
+    end
+end
+
+M.uncompleted_behavior_sets_count = function()
+    count = 0
+    for _, behavior in pairs(M.motivational_behaviors) do
+        count = count + behavior.sensory_feedback
+    end
+    return count
+end
+
+M.start_coordinator = function()
+    local new_behavior = nil
+    local max_motivation = 0
+    local current_motivation = 0
+    local output = ''
+    -- output = output .. tostring(os.time() - start_time)
+    for _, behavior in pairs(M.motivational_behaviors) do
+        current_motivation = M.calculate_motivation(behavior)
+        if output ~= '' then
+            output = output .. ', '
+        end
+        output = output .. current_motivation
+        -- print("Behavior " .. behavior.name .. ": " .. current_motivation)
+        behavior.motivation = current_motivation
+        if current_motivation >= M.motivation_threshold then
+            if max_motivation == 0 or current_motivation > max_motivation then
+                max_motivation = current_motivation
+                new_behavior = behavior
+            end
+        end
+    end
+    print(output)
+    if new_behavior ~= nil then
+        if M.active_behavior == nil or M.active_behavior.behavior ~= new_behavior.name then
+            M.change_behavior_set(new_behavior.name)
+        end
+        M.notifier_function(new_behavior.name)
+    else
+        M.change_behavior_set(nil)
+    end
+end
+
+M.message_received = function(robot_id, behavior_desc)
+    -- print('message_received ' .. robot_id .. behavior_desc)
+    behavior_list = {behavior_desc}
+    time = os.time()
+    if M.robot_behaviors[robot_id] ~= nil then
+        if not has_value(M.robot_behaviors[robot_id].behavior_list, behavior_desc) then
+            behavior_list = M.robot_behaviors[robot_id].behavior_list
+            table.insert(behavior_list, behavior_desc)
+            motivational_behavior = M.motivational_behaviors[behavior_desc]
+            motivational_behavior.motivation = 0
+            if M.active_behavior ~= nil and M.active_behavior.behavior == behavior_desc then
+                print('message_received')
+                M.change_behavior_set(nil)
+            end
+        else
+            time = M.robot_behaviors[robot_id].time
+        end
+    else
+        motivational_behavior = M.motivational_behaviors[behavior_desc]
+        motivational_behavior.motivation = 0
+        if M.active_behavior ~= nil and M.active_behavior.behavior == behavior_desc then
+            print('message_received')
+            M.change_behavior_set(nil)
+        end
+    end
+    M.robot_behaviors[robot_id] = {
+        behavior = behavior_desc,
+        time = time,
+        behavior_list = behavior_list
+    }
+end
+
+M.behavior_impatience = function(motivational_behavior_desc)
+    motivational_behavior = M.motivational_behaviors[motivational_behavior_desc]
+    impatience = motivational_behavior.impatience
+    if next(M.robot_behaviors) ~= nil then
+        current_time = os.time()
+        for _, robot in pairs(M.robot_behaviors) do
+            time_past = current_time - robot.time
+            if robot.behavior == motivational_behavior_desc and time_past < impatience.affect_time then
+                return impatience.slow_rate
+            end
+        end 
+    end
+    return impatience.fast_rate
+end
+
+M.behavior_acquiescence = function(motivational_behavior_desc)
+    if M.active_behavior == nil or motivational_behavior_desc ~= M.active_behavior.behavior then
+        return 1
+    end
+    current_time = os.time()
+    behavior_time = current_time - M.active_behavior.time
+    motivational_behavior =  M.motivational_behaviors[motivational_behavior_desc]
+    acquiescence = motivational_behavior.acquiescence
+    if behavior_time > acquiescence.give_up_time  then
+        print((os.time() - start_time) .. ' Giving up on ' .. motivational_behavior_desc)
+        return 0
+    elseif behavior_time > acquiescence.yield_time and next(M.robot_behaviors) ~= nil then
+        for _, robot in pairs(M.robot_behaviors) do
+            if robot.behavior == motivational_behavior_desc then
+                print((os.time() - start_time).. ' Yielding ' .. motivational_behavior_desc)
+                return 0
+            end
+        end
+    end
+    return 1
+end
+
+M.behavior_category = function(motivational_behavior_desc)
+    if  M.active_behavior ~= nil and M.active_behavior.behavior == motivational_behavior_desc then
+        return 1
+    elseif M.active_behavior == nil and has_value(M.retry_behaviors, motivational_behavior_desc) then
+        return 0
+    else
+        return 1
+    end
+end
+
+M.configure_notifier = function(notifier_function)
+    M.notifier_function = notifier_function
+end
+
+M.set_motivation_threshold = function(threshold)
+    M.motivation_threshold = threshold
+end
+
+M.set_iteration_timeout = function(timeout)
+    M.iteration_timeout = timeout
 end
 
 ---- Torocó main function. ///
@@ -1329,6 +1576,9 @@ M.run = function(toribio_conf_file)
     end
 
     print ('Torocó go!')
+    start_time = os.time()
+    sched.run(M.start_coordinator)
+    sched.sigrun ({ {}, timeout = M.iteration_timeout }, M.start_coordinator)
 
     sched.loop()
 end
