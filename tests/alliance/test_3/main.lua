@@ -85,11 +85,11 @@ toroco.load_motivational_behavior (
         impatience = {
             slow_rate = 3,
             fast_rate = 5,
-            affect_time = 100
+            affect_time = 600
         },
         acquiescence = {
-            yield_time = 500,
-            give_up_time = 600
+            yield_time = 600,
+            give_up_time = 1000
         }
     }
 )
@@ -102,11 +102,11 @@ toroco.load_motivational_behavior (
         impatience = {
             slow_rate = 2,
             fast_rate = 4,
-            affect_time = 100
+            affect_time = 600
         },
         acquiescence = {
-            yield_time = 500,
-            give_up_time = 600
+            yield_time = 600,
+            give_up_time = 1000
         }
     }
 )

@@ -412,7 +412,6 @@ end
 -- @param event_desc event descriptor (return value of /toroco/device or /toroco/behavior)
 
 local release_inhibition = function (behavior, event_desc)
-    print('release_inhibition ' .. event_desc)
     local event = get_real_event (event_desc)
 
     if not event then
@@ -475,7 +474,6 @@ end
 -- @param receiver_desc Receiver descriptor (return value of /toroco/behavior)
 
 local release_suppression = function (behavior, event_desc, receiver_desc)
-     print('release_inhibition')
     local event = get_real_event (event_desc)
 
     if not event then
@@ -1082,8 +1080,6 @@ end
 -- @param behavior_desc  Behavior descriptor (return value of /toroco/behavior)
 
 M.suspend_behavior = function (behavior_desc)
-    print('suspend_behavior ' .. behavior_desc.emitter)
-    
     local tasks = M.behaviors [behavior_desc.emitter].tasks
 
     for i = #tasks, 1, -1 do
@@ -1091,7 +1087,6 @@ M.suspend_behavior = function (behavior_desc)
         local beh = M.behavior_taskd [tasks[i]]
 
         for event_name, event in pairs(beh.events) do
-            print(event_name)
             if M.active_events [event] then
                 -- set the event as inactive
                 M.active_events [event] = nil
@@ -1313,7 +1308,6 @@ M.load_behavior_set = function (behavior_set_desc, behaviors)
 end
 
 M.suspend_behavior_set = function (behavior_set_desc)
-    print('suspend_behavior_set ' .. behavior_set_desc)
     local suspend_behavior_set = function()
         for _, behavior in ipairs(M.behavior_sets[behavior_set_desc].behaviors) do
             M.suspend_behavior(behavior)
@@ -1413,10 +1407,14 @@ M.calculate_motivation = function(motivational_behavior)
     return motivation
 end
 
-M.change_behavior_set = function(new_behavior_set)
+M.change_behavior_set = function(new_behavior_set, uncompleted_task)
     if M.active_behavior ~= nil then
         M.suspend_behavior_set(M.active_behavior.behavior)
+        if uncompleted_task then
+            table.insert(M.retry_behaviors, M.active_behavior.behavior)
+        end
     end
+
     if new_behavior_set ~= nil then
         print((os.time() - start_time).. ', ' .. new_behavior_set)
         M.resume_behavior_set(new_behavior_set)
@@ -1424,7 +1422,6 @@ M.change_behavior_set = function(new_behavior_set)
            behavior = new_behavior_set,
            time = os.time()
         }
-        table.insert(M.retry_behaviors, new_behavior_set)
     else
         M.active_behavior = nil
     end
@@ -1446,14 +1443,12 @@ M.start_coordinator = function()
     local max_motivation = 0
     local current_motivation = 0
     local output = ''
-    -- output = output .. tostring(os.time() - start_time)
     for _, behavior in pairs(M.motivational_behaviors) do
         current_motivation = M.calculate_motivation(behavior)
         if output ~= '' then
             output = output .. ', '
         end
         output = output .. current_motivation
-        -- print("Behavior " .. behavior.name .. ": " .. current_motivation)
         behavior.motivation = current_motivation
         if current_motivation >= M.motivation_threshold then
             if max_motivation == 0 or current_motivation > max_motivation then
@@ -1465,16 +1460,15 @@ M.start_coordinator = function()
     print(output)
     if new_behavior ~= nil then
         if M.active_behavior == nil or M.active_behavior.behavior ~= new_behavior.name then
-            M.change_behavior_set(new_behavior.name)
+            M.change_behavior_set(new_behavior.name, true)
         end
         M.notifier_function(new_behavior.name)
     else
-        M.change_behavior_set(nil)
+        M.change_behavior_set(nil, true)
     end
 end
 
 M.message_received = function(robot_id, behavior_desc)
-    -- print('message_received ' .. robot_id .. behavior_desc)
     behavior_list = {behavior_desc}
     time = os.time()
     if M.robot_behaviors[robot_id] ~= nil then
@@ -1484,8 +1478,7 @@ M.message_received = function(robot_id, behavior_desc)
             motivational_behavior = M.motivational_behaviors[behavior_desc]
             motivational_behavior.motivation = 0
             if M.active_behavior ~= nil and M.active_behavior.behavior == behavior_desc then
-                print('message_received')
-                M.change_behavior_set(nil)
+                M.change_behavior_set(nil, false)
             end
         else
             time = M.robot_behaviors[robot_id].time
@@ -1494,8 +1487,7 @@ M.message_received = function(robot_id, behavior_desc)
         motivational_behavior = M.motivational_behaviors[behavior_desc]
         motivational_behavior.motivation = 0
         if M.active_behavior ~= nil and M.active_behavior.behavior == behavior_desc then
-            print('message_received')
-            M.change_behavior_set(nil)
+            M.change_behavior_set(nil, false)
         end
     end
     M.robot_behaviors[robot_id] = {

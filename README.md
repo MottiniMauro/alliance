@@ -1,8 +1,10 @@
 # ALLIANCE using Toroco
 
-This library is a fork of the original Torocó repo (accessible at https://gitlab.fing.edu.uy/fbenavid/toroco) which provides an implementation of the Subsumption robot control architecture for Lua based on Toribio.
+This library is a fork of the original Torocó repo (accessible at https://gitlab.fing.edu.uy/fbenavid/toroco) which provides an implementation of the Subsumption robot control architecture based on Lua programming language and derived tools ([Toribio](https://github.com/xopxe/Toribio), [Lumen](https://github.com/xopxe/lumen)).
 
-What this version of the library provides is an inclusion of thenew features to provide support for systems based on the ALLIANCE robot control architecture.
+It aims at providing new features to support the cooperative control of multi-robot systems, based on the Alliance robotic control architecture.
+
+This library was implemented and tested on a machine running Ubuntu 18.04.4.
 
 ## Instalation
 
@@ -11,12 +13,12 @@ To run this library you will need Lua 5.1 install, you can get the source from h
 Afterwards you should clone this repo and then also clone Toribio and Lumen inside of the Toroco folder:
 
 ```
-git clone git@gitlab.fing.edu.uy:fbenavid/toroco.git
+git clone git@gitlab.fing.edu.uy:mauro.mottini/alliance.git
 cd toroco
 git clone git://github.com/xopxe/Toribio.git
 mv Toribio toribio
 cd toribio 
-git clone https://github.com/xopxe/lumen.git
+git clone git://github.com/xopxe/lumen.git
 ```
 
 ## Notes
