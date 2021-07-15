@@ -1,5 +1,7 @@
 # ALLIANCE using Toroco
 
+<img src="./logo.png" width="50">
+
 This library is a fork of the original Torocó repo (accessible at https://gitlab.fing.edu.uy/fbenavid/toroco) which provides an implementation of the Subsumption robot control architecture based on Lua programming language and derived tools ([Toribio](https://github.com/xopxe/Toribio), [Lumen](https://github.com/xopxe/lumen)).
 
 It aims at providing new features to support the cooperative control of multi-robot systems, based on the Alliance robotic control architecture.
