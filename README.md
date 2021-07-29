@@ -10,7 +10,13 @@ This library was implemented and tested on a machine running Ubuntu 18.04.4.
 
 ## Instalation
 
-To run this library you will need Lua 5.1 install, you can get the source from https://www.lua.org/ftp/
+The required installations to run ALLIANCE are the same that are required by Toroco, so we recommend the ([Toroco full installation guide](https://gitlab.fing.edu.uy/fbenavid/toroco#installing-nixio)).
+
+In case you are not following the installation guide for Toroco, you will need to install the following dependencies:
+
+- Lua 5.1.5, you can get the source from https://www.lua.org/ftp/
+- [Nixio](https://github.com/Neopallium/nixio) which Toribio has as a dependency
+
 
 Afterwards you should clone this repo and then also clone Toribio and Lumen inside of the Toroco folder:
 
