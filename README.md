@@ -21,7 +21,7 @@ In case you are not following the installation guide for Toroco, you will need t
 Afterwards you should clone this repo and then also clone Toribio and Lumen inside of the Toroco folder:
 
 ```
-git clone git@gitlab.fing.edu.uy:mauro.mottini/alliance.git
+git clone git@github.com:MottiniMauro/alliance.git
 cd toroco
 git clone git://github.com/xopxe/Toribio.git
 mv Toribio toribio
